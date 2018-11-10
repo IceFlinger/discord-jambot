@@ -1,146 +1,405 @@
 #!/usr/bin/env python
 import discord
 import asyncio
-import configparser
-import sys
 import importlib
-import threading
-import sqlite3
+import yaml
+import traceback
+import sys
+import botmodule
+import logging
 
-config_file = "jambot.cfg"
+logging.basicConfig(level=logging.INFO)
 
-class botModule():
-	def set(self, setting, value):
-		try:
-			message = (self.name, "SET", setting, value)
-			self.send.put(message)
-			self.send.join()
-			return True
-		except:
-			print("Couldn't set " + self.name + " setting " + setting + " to " + str(value))
-			return False
-
-	def get(self, setting):
-		try:
-			message = (self.name, "GET", "")
-			self.send.put(message)
-			self.send.join()
-			value = self.recv.get()
-			self.recv.task_done()
-			return value
-		except:
-			print("Couldn't get " + self.name + " setting " + setting)
-			return None
-
-	def init_settings(self):
-		pass
-
-	def bind_events(self):
-		pass
-
-	def __init__(self, name, bot, send, recv):
-		self.name = name
-		self.bot = bot
-		self.send = send
-		self.recv = recv
-		self.event_loop = asyncio.new_event_loop()
-		self.c = discord.Client(loop=self.event_loop)
-		self.init_settings()
-		self.bind_events()
-
-class botMain():
-	def set(self, setting, value, module="jambot"):
-		self.settings[module][setting] = value
-
-	def get(self, setting, module="jambot"):
-		return self.settings[module][setting]
-
-	def _spawn_module_thread(self, module, moduleClass, send, recv):
-		return moduleClass(module, self, send, recv)
-
-	def _load_modules(self):
-		for module in self.get("modules"):
-			moduleClass = getattr(importlib.import_module("modules." + module), 'moduleClass')
-			new_queue = Queue()
-			newmodule = threading.Thread(target=self._spawn_module_thread(module, moduleClass, self.recv_queue, new_queue))
-			self.modules.append(newmodule)
-			self.send_queues[module] = new_queue
-			newmodule.start()
-			print("Loaded " + module)
-
-	def _save_config(self):
-		conf = open(config_file, 'w')
-		conf.write('[jambot]\n')
-		for setting in self.settings["jambot"]: 
-			newconf = self.settings["jambot"][setting]
-			if type(newconf) is list:
-				newconf = " ".join(self.settings["jambot"][setting])
-			conf.write(setting + '\t= ' + str(newconf) + "\n")
-		conf.write('\n')
-		for module in self.get("modules"):
-			conf.write('[' + module + ']\n')
-			for setting in self.settings[module]:
-				conf.write('# ' + str(self.settings[module][setting][1]) + "\n")
-				conf.write(setting + '\t= ' + str(self.settings[module][setting][0]) + "\n")
-			conf.write('\n')
-		conf.close()
-
-	def is_command(self, message):
-		if message.content[0] == self.get("command_prefix"):
-			args = message.content.split()[1:]
-			command = message.content.split()[0].split(self.get("command_prefix"))[1]
-			admin = False
-			if message.author.id == self.get("owner"):
-				admin = True
-			return {"command": command, "args": args, "admin": admin}
+class loaded_mods():
+	def __init__(self):
+		self.loaded = []
+		self.instances = {}
+	
+	async def fetch_mod_context(self, configs, modname, server, channel):
+		chanindex = str(modname) + str(server) + str(channel)
+		servindex = str(modname) + str(server)
+		if chanindex in self.instances:
+			try:
+				conf = configs["servers"][server]["channels"][channel][modname]
+			except:
+				conf = {}
+			return {"module": self.instances[chanindex], "config": conf}
+		elif servindex in self.instances:
+			try:
+				conf = configs["servers"][server][modname]
+			except:
+				conf = {}
+			return {"module": self.instances[servindex], "config": conf}
+		elif modname in self.instances:
+			try:
+				conf = configs[modname]
+			except:
+				conf = {}
+			return {"module": self.instances[modname], "config": conf}
 		return False
 
-	def initialize(self):
-		self.config = configparser.ConfigParser()
-		self.config.read(config_file)
-		self.settings = {}
-		self.settings["jambot"] = {}
-		self.modules = []
-		self.set("modules", self.config["jambot"]["modules"].split())
-		self.set("database", self.config["jambot"]["database"])
-		self.set("command_prefix", self.config["jambot"]["command_prefix"][0])
-		self.set("version", self.config["jambot"]["version"])
-		self.set("token", self.config["jambot"]["token"])
-		self.set("owner", self.config["jambot"]["owner"])
-		self.recv_queue = Queue()
-		self.send_queues = {}
-		self._load_modules()
-		self.c = discord.Client()
+	async def fetch_mod_config(self, configs, instname):
+		conf = {}
+		module = self.instances[instname].name
+		if self.instances[instname].context == "global":
+			conf = configs[module]
+		elif self.instances[instname].context == "server":
+			conf = configs["servers"][self.instances[instname].server][module]
+		elif self.instances[instname].context == "channel":
+			conf = configs["servers"][self.instances[instname].server]["channels"][self.instances[instname].channel][module]
+		return {"module": self.instances[instname], "config": conf}
 
-		@self.c.event
-		async def on_ready():
-			print('Logged in as ' + self.c.user.name + " " + self.c.user.id)
-			print('------')
-		@self.c.event
-		async def on_message(message):
-			cmd = self.is_command(message)
-			print(cmd)
-			if cmd:
-				command = cmd["command"]
-				admin = cmd["admin"]
-				args = cmd["args"]
-				if command == "save" and admin:
-					self._save_config()
-					await self.c.send_message(message.channel, "Saved new config to " + config_file)
-				elif command == "set" and args:
-					if len(args) >= 3 and admin:
-						qmodule = args[0]
-						qsetting = args[1]
-						qvalue = " ".join(args[2:])
-						message = (qmodule, "GET", qsetting)
-						self.recv.put(message)
-						self.recv.join()
-						message = (qmodule, "SET", qsetting, qvalue)
-						self.recv.put(message)
-						self.recv.join()
-						await self.client.send_message(message.channel, qmodule + " setting " + qsetting + " changed from " + str(oldvalue) + " to " + str(qvalue))
-					except:
-						await self.c.send_message(message.channel, "Couldn't set " + self.name + " setting " + setting + " to " + str(value))
+	def loadmod(self, module, server = "", channel = ""):
+		moduleClass = getattr(importlib.import_module("modules." + module), 'moduleClass')
+		context = ""
+		if server == "" and channel == "":
+			context = "global"
+		elif channel == "":
+			context = "server"
+		else:
+			context = "channel"
+		newmodule = moduleClass(module, context, server, channel)
+		self.instances[module + str(server) + str(channel)] = newmodule
+		if not module in self.loaded:
+			self.loaded.append(module)
+
+
+class jambot(discord.Client):
+	def initialize(self, config_file):
+		with open(config_file) as stream:
+			try:
+				self.config = yaml.load(stream)
+			except yaml.YAMLError as exc:
+				print(exc)
+		self.mods = loaded_mods()
+		for module in self.config["global_modules"]:
+			self.mods.loadmod(module)
+			settings = self.mods.instances[module].defaults
+			try:
+				for setting in self.config[module]:
+					settings[setting] = self.config[module][setting]
+			except:
+				pass
+			self.config[module] = settings
+		try:
+			for server in self.config["servers"]:
+				for channel in self.config["servers"][server]["channels"]:
+					for module in self.config["servers"][server]["channels"][channel]["channel_modules"]:
+						self.mods.loadmod(module, server, channel)
+						settings = self.mods.instances[module + str(server) + str(channel)].defaults
+						try:
+							for setting in self.config["servers"][server]["channels"][channel][module]:
+								settings[setting] = self.config["servers"][server]["channels"][channel][module][setting]
+						except:
+							pass
+						self.config["servers"][server]["channels"][channel][module] = settings
+				for module in self.config["servers"][server]["server_modules"]:
+						self.mods.loadmod(module, server)
+						settings = self.mods.instances[module + str(server)].defaults
+						try:
+							for setting in self.config["servers"][server][module]:
+								settings[setting] = self.config["servers"][server][module][setting]
+						except:
+							pass
+						self.config["servers"][server][module] = settings
+		except KeyError:
+			pass
+
+#save
+#load?
+
+# Channel-context calls
+	async def get_context(self, channel):
+		if isinstance(channel, discord.Reaction):
+			channel = channel.message
+		if isinstance(channel, discord.Message):
+			channel = channel.channel
+		if isinstance(channel, discord.TextChannel):
+			return {"server": channel.guild.id, "channel": channel.id}
+		else:
+			return {"server": channel.id, "channel": channel.id}
+		return {}
+
+	async def on_typing(self, channel, user, when):
+		for module in self.mods.loaded:
+			context = await self.get_context(channel)
+			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
+			if inst != False:
+				await inst["module"].on_typing(self, inst["config"], channel, user, when)
+
+	async def on_message(self, message):
+		for module in self.mods.loaded:
+			context = await self.get_context(message)
+			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
+			if inst != False:
+				await inst["module"].on_message(self, inst["config"], message)
+
+	async def on_message_delete(self, message):
+		for module in self.mods.loaded:
+			context = await self.get_context(message)
+			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
+			if inst != False:
+				await inst["module"].on_message_delete(self, inst["config"], message)
+
+	async def on_message_edit(self, before, after):
+		for module in self.mods.loaded:
+			context = await self.get_context(before)
+			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
+			if inst != False:
+				await inst["module"].on_message_edit(self, inst["config"], before, after)
+
+	async def on_reaction_add(self, reaction, user):
+		for module in self.mods.loaded:
+			context = await self.get_context(reaction)
+			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
+			if inst != False:
+				await inst["module"].on_reaction_add(self, inst["config"], reaction, user)
+
+	async def on_reaction_remove(self, reaction, user):
+		for module in self.mods.loaded:
+			context = await self.get_context(reaction)
+			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
+			if inst != False:
+				await inst["module"].on_reaction_remove(self, inst["config"], reaction, user)
+
+	async def on_reaction_clear(self, message, reactions):
+		for module in self.mods.loaded:
+			context = await self.get_context(message)
+			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
+			if inst != False:
+				await inst["module"].on_reaction_clear(self, inst["config"], message, reactions)
+
+	async def on_private_channel_delete(self, channel):
+		for module in self.mods.loaded:
+			context = await self.get_context(channel)
+			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
+			if inst != False:
+				await inst["module"].on_private_channel_delete(self, inst["config"], channel)
+
+	async def on_private_channel_create(self, channel):
+		for module in self.mods.loaded:
+			context = await self.get_context(channel)
+			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
+			if inst != False:
+				await inst["module"].on_private_channel_create(self, inst["config"], channel)
+
+	async def on_private_channel_update(self, before, after):
+		for module in self.mods.loaded:
+			context = await self.get_context(before)
+			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
+			if inst != False:
+				await inst["module"].on_private_channel_update(self, inst["config"], before, after)
+
+	async def on_private_channel_pins_update(self, channel, last_pin):
+		for module in self.mods.loaded:
+			context = await self.get_context(channel)
+			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
+			if inst != False:
+				await inst["module"].on_private_channel_pins_update(self, inst["config"], channel, last_pin)
+
+	async def on_guild_channel_delete(self, channel):
+		for module in self.mods.loaded:
+			context = await self.get_context(channel)
+			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
+			if inst != False:
+				await inst["module"].on_guild_channel_delete(self, inst["config"], channel)
+
+	async def on_guild_channel_create(self, channel):
+		for module in self.mods.loaded:
+			context = await self.get_context(channel)
+			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
+			if inst != False:
+				await inst["module"].on_guild_channel_create(self, inst["config"], channel)
+
+	async def on_guild_channel_update(self, before, after):
+		for module in self.mods.loaded:
+			context = await self.get_context(before)
+			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
+			if inst != False:
+				await inst["module"].on_guild_channel_update(self, inst["config"], before, after)
+
+	async def on_guild_channel_pins_update(self, channel, last_pin):
+		for module in self.mods.loaded:
+			context = await self.get_context(channel)
+			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
+			if inst != False:
+				await inst["module"].on_guide_channel_pins_update(self, inst["config"], channel, last_pin)
+
+	async def on_webhooks_update(self, channel):
+		for module in self.mods.loaded:
+			context = await self.get_context(channel)
+			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
+			if inst != False:
+				await inst["module"].on_webhooks_update(self, inst["config"], channel)
+
+# All instance calls
+
+	async def on_connect(self):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			await inst["module"].on_connect(self, inst["config"])
+
+	async def on_ready(self):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			await inst["module"].on_ready(self, inst["config"])
+
+	async def on_shard_ready(self, shard_id):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			await inst["module"].on_shard_ready(self, inst["config"], shard_id)
+
+	async def on_resumed(self):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			await inst["module"].on_shard_ready(self, inst["config"])
+
+	async def on_error(self, event, *args, **kwargs):
+		await super(jambot, self).on_error(event, *args, **kwargs)
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			await inst["module"].on_error(self, inst["config"], event, *args, **kwargs)
+
+# Global only calls
+
+	async def on_socket_raw_receive(self, msg):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			if inst["module"].context == "global":
+				await inst["module"].on_socket_raw_receive(self, inst["config"], msg)
+
+	async def on_socket_raw_send(self, payload):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			if inst["module"].context == "global":
+				await inst["module"].on_socket_raw_send(self, inst["config"], payload)
+
+	async def on_raw_message_delete(self, payload):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			if inst["module"].context == "global":
+				await inst["module"].on_raw_message_delete(self, inst["config"], payload)
+
+	async def on_raw_bulk_message_delete(self, payload):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			if inst["module"].context == "global":
+				await inst["module"].on_raw_bulk_message_delete(self, inst["config"], payload)
+
+	async def on_raw_message_edit(self, payload):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			if inst["module"].context == "global":
+				await inst["module"].on_raw_message_edit(self, inst["config"], payload)
+
+	async def on_raw_reaction_add(self, payload):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			if inst["module"].context == "global":
+				await inst["module"].on_raw_reaction_add(self, inst["config"], payload)
+
+	async def on_raw_reaction_remove(self, payload):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			if inst["module"].context == "global":
+				await inst["module"].on_raw_reaction_remove(self, inst["config"], payload)
+
+	async def on_raw_reaction_clear(self, payload):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			if inst["module"].context == "global":
+				await inst["module"].on_raw_reaction_clear(self, inst["config"], payload)
+
+# Server-level calls
+
+	async def get_server_context(self, guild):
+		if isinstance(guild, discord.Role) or isinstance(guild, discord.Member):
+			guild = guild.guild
+		return guild.id
+
+	async def on_guild_join(self, guild):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			serv = await self.get_server_context(guild)
+			if inst["module"].context == "global" or (inst["module"].server == serv):
+				await inst["module"].on_guild_join(self, inst["config"], guild)
+
+	async def on_guild_remove(self, guild):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			serv = await self.get_server_context(guild)
+			if inst["module"].context == "global" or (inst["module"].server == serv):
+				await inst["module"].on_guild_remove(self, inst["config"], guild)
+
+	async def on_guild_update(self, before, after):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			serv = await self.get_server_context(before)
+			if inst["module"].context == "global" or (inst["module"].server == serv):
+				await inst["module"].on_guild_update(self, inst["config"], before, after)
+
+	async def on_guild_role_create(self, role):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			serv = await self.get_server_context(role)
+			if inst["module"].context == "global" or (inst["module"].server == serv):
+				await inst["module"].on_guild_role_create(self, inst["config"], role)
+
+	async def on_guild_role_delete(self, role):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			serv = await self.get_server_context(role)
+			if inst["module"].context == "global" or (inst["module"].server == serv):
+				await inst["module"].on_guild_role_delete(self, inst["config"], role)
+
+	async def on_guild_role_update(self, before, after):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			serv = await self.get_server_context(before)
+			if inst["module"].context == "global" or (inst["module"].server == serv):
+				await inst["module"].on_guild_role_update(self, inst["config"], before, after)
+
+	async def on_guild_emojis_update(self, guild, before, after):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			serv = await self.get_server_context(guild)
+			if inst["module"].context == "global" or (inst["module"].server == serv):
+				await inst["module"].on_guild_emojis_update(self, inst["config"], guild, before, after)
+
+	async def on_guild_available(self, guild):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			serv = await self.get_server_context(guild)
+			if inst["module"].context == "global" or (inst["module"].server == serv):
+				await inst["module"].on_guild_available(self, inst["config"], guild)
+
+	async def on_guild_unavailable(self, guild):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			serv = await self.get_server_context(guild)
+			if inst["module"].context == "global" or (inst["module"].server == serv):
+				await inst["module"].on_guild_unavailable(self, inst["config"], guild)
+
+	async def on_voice_state_update(self, member, before, after):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			serv = await self.get_server_context(member)
+			if inst["module"].context == "global" or (inst["module"].server == serv):
+				await inst["module"]. on_voice_state_update(self, inst["config"], member, before, after)
+
+	async def on_member_ban(self, guild, user):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			serv = await self.get_server_context(guild)
+			if inst["module"].context == "global" or (inst["module"].server == serv):
+				await inst["module"].on_member_ban(self, inst["config"], guild, user)
+
+	async def on_member_unban(self, guild, user):
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			serv = await self.get_server_context(guild)
+			if inst["module"].context == "global" or (inst["module"].server == serv):
+				await inst["module"].on_member_unban(self, inst["config"], guild, user)
 
 if __name__ == "__main__":
 	if "--help" in sys.argv:
@@ -148,15 +407,16 @@ if __name__ == "__main__":
 		print(" jambot.py [config file]")
 		print("Defaults to jambot.cfg")
 		sys.exit(0)
+	config_file = "jambot.cfg"
 	if len(sys.argv) > 1:
 		config_file = sys.argv[1]
-	bot = botMain()
+	bot = jambot()
 	try:
-		bot.initialize()
-	except KeyboardInterrupt as e:
-		bot.shutdown()
-	except SystemExit as e:
-		bot.shutdown()
+		bot.initialize(config_file)
+		bot.run(bot.config["token"])
+	except discord.errors.LoginFailure as e:
+		print("Token is invalid.")
+		exit()
 	except:
 		traceback.print_exc()
-	bot.shutdown()
+	exit()
