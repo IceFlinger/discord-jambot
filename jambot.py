@@ -1,14 +1,19 @@
 #!/usr/bin/env python
 import discord
 import asyncio
+import aioodbc #ayooodbck
 import importlib
 import yaml
 import traceback
 import sys
 import botmodule
 import logging
+import json
+import pyodbc
 
 logging.basicConfig(level=logging.INFO)
+
+config_file = "jambot.yml"
 
 class loaded_mods():
 	def __init__(self):
@@ -66,6 +71,7 @@ class loaded_mods():
 
 class jambot(discord.Client):
 	def initialize(self, config_file):
+		self.config_file = config_file
 		with open(config_file) as stream:
 			try:
 				self.config = yaml.load(stream)
@@ -74,6 +80,7 @@ class jambot(discord.Client):
 		self.mods = loaded_mods()
 		for module in self.config["global_modules"]:
 			self.mods.loadmod(module)
+			print("Loaded " + module + "(Global)")
 			settings = self.mods.instances[module].defaults
 			try:
 				for setting in self.config[module]:
@@ -83,32 +90,52 @@ class jambot(discord.Client):
 			self.config[module] = settings
 		try:
 			for server in self.config["servers"]:
-				for channel in self.config["servers"][server]["channels"]:
-					for module in self.config["servers"][server]["channels"][channel]["channel_modules"]:
-						self.mods.loadmod(module, server, channel)
-						settings = self.mods.instances[module + str(server) + str(channel)].defaults
-						try:
-							for setting in self.config["servers"][server]["channels"][channel][module]:
-								settings[setting] = self.config["servers"][server]["channels"][channel][module][setting]
-						except:
-							pass
-						self.config["servers"][server]["channels"][channel][module] = settings
-				for module in self.config["servers"][server]["server_modules"]:
-						self.mods.loadmod(module, server)
-						settings = self.mods.instances[module + str(server)].defaults
-						try:
-							for setting in self.config["servers"][server][module]:
-								settings[setting] = self.config["servers"][server][module][setting]
-						except:
-							pass
-						self.config["servers"][server][module] = settings
+				try:
+					for channel in self.config["servers"][server]["channels"]:
+						for module in self.config["servers"][server]["channels"][channel]["channel_modules"]:
+							self.mods.loadmod(module, server, channel)
+							print("Loaded " + module + str(server) + str(channel) + "(Channel)")
+							settings = self.mods.instances[module + str(server) + str(channel)].defaults
+							try:
+								for setting in self.config["servers"][server]["channels"][channel][module]:
+									settings[setting] = self.config["servers"][server]["channels"][channel][module][setting]
+							except:
+								pass
+							self.config["servers"][server]["channels"][channel][module] = settings
+				except KeyError:
+					pass
+				try:
+					for module in self.config["servers"][server]["server_modules"]:
+							self.mods.loadmod(module, server)
+							print("Loaded " + module + str(server) + "(Server)")
+							settings = self.mods.instances[module + str(server)].defaults
+							try:
+								for setting in self.config["servers"][server][module]:
+									settings[setting] = self.config["servers"][server][module][setting]
+							except:
+								pass
+							self.config["servers"][server][module] = settings
+				except KeyError:
+					pass
 		except KeyError:
 			pass
 
-#save
-#load?
+#DB
+	async def db_query(self, query, params = ()):
+		cur = await self.db.cursor()
+		await cur.execute(query, params)
+		try:
+			r = await cur.fetchall()
+		except pyodbc.ProgrammingError:
+			r = []
+		await cur.close()
+		return r
 
-# Channel-context calls
+	async def db_commit(self):
+		await self.db.commit()
+
+#Helpers
+
 	async def get_context(self, channel):
 		if isinstance(channel, discord.Reaction):
 			channel = channel.message
@@ -120,6 +147,30 @@ class jambot(discord.Client):
 			return {"server": channel.id, "channel": channel.id}
 		return {}
 
+	async def cmd(self):
+		return self.config["command_prefix"]
+
+	async def get_cmd(self, message):
+		cmd = await self.cmd()
+		admin = False
+		if message.author.id == self.config["owner"]:
+			admin = True
+		if (message.content[:len(cmd)] == cmd):
+			cmdstring = message.content[len(cmd):].split()
+			return {"cmd": cmdstring[0], "args": cmdstring[1:], "admin": admin}
+		else:
+			return False
+
+#save
+#load?
+
+	async def save_config(self):
+		mainkeys = ["database", "command_prefix", "version", "token", "owner"]
+
+
+# Discord API Event Calls
+# Channel-context calls
+
 	async def on_typing(self, channel, user, when):
 		for module in self.mods.loaded:
 			context = await self.get_context(channel)
@@ -128,6 +179,17 @@ class jambot(discord.Client):
 				await inst["module"].on_typing(self, inst["config"], channel, user, when)
 
 	async def on_message(self, message):
+		cmd = await self.get_cmd(message)
+		if (cmd):
+			if cmd["cmd"] == "save" and cmd["admin"]:
+				print(yaml.dump(self.config, default_flow_style=False))
+				print(json.dumps(self.config))
+			if cmd["cmd"] == "load" and cmd["admin"]:
+				pass
+			if cmd["cmd"] == "set" and cmd["admin"]:
+				pass
+			if cmd["cmd"] == "get" and cmd["admin"]:
+				pass
 		for module in self.mods.loaded:
 			context = await self.get_context(message)
 			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
@@ -223,7 +285,7 @@ class jambot(discord.Client):
 			context = await self.get_context(channel)
 			inst = await self.mods.fetch_mod_context(self.config, module, context["server"], context["channel"])
 			if inst != False:
-				await inst["module"].on_guide_channel_pins_update(self, inst["config"], channel, last_pin)
+				await inst["module"].on_guild_channel_pins_update(self, inst["config"], channel, last_pin)
 
 	async def on_webhooks_update(self, channel):
 		for module in self.mods.loaded:
@@ -233,16 +295,17 @@ class jambot(discord.Client):
 				await inst["module"].on_webhooks_update(self, inst["config"], channel)
 
 # All instance calls
-
-	async def on_connect(self):
-		for module in self.mods.instances:
-			inst = await self.mods.fetch_mod_config(self.config, module)
-			await inst["module"].on_connect(self, inst["config"])
-
 	async def on_ready(self):
 		for module in self.mods.instances:
 			inst = await self.mods.fetch_mod_config(self.config, module)
 			await inst["module"].on_ready(self, inst["config"])
+
+	async def on_connect(self):
+		dsn = 'Driver=SQLite3;Database=' + self.config["database"]
+		self.db = await aioodbc.connect(dsn=dsn, loop=self.loop) #needs to be setup after login/event loop is running
+		for module in self.mods.instances:
+			inst = await self.mods.fetch_mod_config(self.config, module)
+			await inst["module"].on_connect(self, inst["config"])
 
 	async def on_shard_ready(self, shard_id):
 		for module in self.mods.instances:
@@ -252,7 +315,7 @@ class jambot(discord.Client):
 	async def on_resumed(self):
 		for module in self.mods.instances:
 			inst = await self.mods.fetch_mod_config(self.config, module)
-			await inst["module"].on_shard_ready(self, inst["config"])
+			await inst["module"].on_resumed(self, inst["config"])
 
 	async def on_error(self, event, *args, **kwargs):
 		await super(jambot, self).on_error(event, *args, **kwargs)
@@ -401,13 +464,19 @@ class jambot(discord.Client):
 			if inst["module"].context == "global" or (inst["module"].server == serv):
 				await inst["module"].on_member_unban(self, inst["config"], guild, user)
 
+#clean up db
+	async def logout(self):
+		self.pool.close()
+		await self.pool.wait_closed()
+		await super(jambot, self).on_error(event, *args, **kwargs)
+
+
 if __name__ == "__main__":
 	if "--help" in sys.argv:
 		print("Jambot Modular Discord Bot. Usage:")
 		print(" jambot.py [config file]")
 		print("Defaults to jambot.cfg")
 		sys.exit(0)
-	config_file = "jambot.cfg"
 	if len(sys.argv) > 1:
 		config_file = sys.argv[1]
 	bot = jambot()

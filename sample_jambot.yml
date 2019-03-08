@@ -1,0 +1,30 @@
+database: jambot.db
+command_prefix: '>'
+version: discord-jambot 0.1
+token: reallylongdiscordtoken
+owner: 123412341234
+global_modules: ["global_sample_module", "general_sample"]
+
+global_sample_module:
+  setting: test
+
+general_sample:
+  setting: test
+
+servers:
+  ##server name of 1234 output from save command##
+  1234123412341234:
+    server_modules: ["server_sample_module", "general_sample"]
+    #modules loaded to server scope will override global modules within its server
+    server_sample_module:
+      setting: test
+    general_sample:
+      setting: test
+    channels:
+      ##channel name of 2345 output from save command##
+      1234123412342134:
+        channel_modules: ["channel_sample_module", "general_sample"]
+        channel_sample_module:
+          setting: test
+        general_sample:
+          setting: test

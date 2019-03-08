@@ -4,10 +4,11 @@ import inspect
 
 class moduleClass(botmodule):
 
-# Channel-context calls
-# Called by the most specifically context module for any given loaded module type (sandboxed)
 	def default_config(self):
-		return {"level": 20}
+		return {"level": 10,
+				"raw_level": 10,
+				"message_level": 20
+		}
 
 	def on_init(self):
 		self.logger = logging.getLogger("jambot.monitor")
@@ -28,11 +29,40 @@ class moduleClass(botmodule):
 			channel = str(self.channel)
 		return self.context + "/" + server + "/" + channel
 
+# Channel-context calls
+# Called by the most specifically context module for any given loaded module type (sandboxed)
+
 	async def on_typing(self, client, config, channel, user, when):
 		self.logger.log(config["level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
+		try:
+			serv = str(channel.guild.name)
+		except:
+			serv = ""
+		try:
+			chan = str(channel.name)
+		except AttributeError:
+			chan = str(channel.me.name)
+		try:
+			nick = user.nick
+		except:
+			nick = user.name
+		self.logger.log(config["message_level"], serv + "/" + chan + " " + nick + " typing at: " +  str(when))
 
 	async def on_message(self, client, config, message):
 		self.logger.log(config["level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
+		try:
+			serv = str(message.channel.guild.name)
+		except:
+			serv = ""
+		try:
+			chan = str(message.channel.name)
+		except AttributeError:
+			chan = str(message.channel.me.name)
+		try:
+			nick = message.author.nick
+		except:
+			nick = message.author.name
+		self.logger.log(config["message_level"], serv + "/" + chan + " " + nick + ": " +  message.clean_content)
 
 	async def on_message_delete(self, client, config, message):
 		self.logger.log(config["level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
@@ -54,6 +84,7 @@ class moduleClass(botmodule):
 
 	async def on_private_channel_create(self, client, config, channel):
 		self.logger.log(config["level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
+		self.logger.log(config["level"], str(channel) + ": " +  inspect.stack()[0][3])
 
 	async def on_private_channel_update(self, client, config, before, after):
 		self.logger.log(config["level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
@@ -100,10 +131,12 @@ class moduleClass(botmodule):
 # Only called in global context
 
 	async def on_socket_raw_receive(self, client, config, msg):
-		self.logger.log(config["level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
+		self.logger.log(config["raw_level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
+		self.logger.log(config["raw_level"], str(msg))
 
 	async def on_socket_raw_send(self, client, config, payload):
-		self.logger.log(config["level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
+		self.logger.log(config["raw_level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
+		self.logger.log(config["raw_level"], str(payload))
 
 	async def on_raw_message_delete(self, client, config, payload):
 		self.logger.log(config["level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
