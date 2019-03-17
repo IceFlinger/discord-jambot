@@ -62,7 +62,7 @@ class moduleClass(botmodule):
 			nick = message.author.nick
 		except:
 			nick = message.author.name
-		self.logger.log(config["message_level"], serv + "/" + chan + " " + nick + ": " +  message.clean_content)
+		self.logger.log(config["message_level"], serv + "/" + chan + " " + nick + ": " +  message.content)
 
 	async def on_message_delete(self, client, config, message):
 		self.logger.log(config["level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
