@@ -2,8 +2,11 @@ from botmodule import botmodule
 import requests
 from lxml import html
 import random
+import logging
 import time
+import io
 import hashlib
+from PIL import Image, ImageOps
 
 class moduleClass(botmodule):
 
@@ -34,7 +37,7 @@ class moduleClass(botmodule):
 			urls = []
 			if len(message.attachments) > 0:
 				for link in message.attachments:
-					urls.append((link.url, link.filename))
+					urls.append((link.url, link.filename.split('.')[0]))
 			#append args
 			print(urls)
 			for urlp in urls:
@@ -60,8 +63,8 @@ class moduleClass(botmodule):
 					if key in config["downloads"]:
 						await message.channel.send(config["uploads"][key]["web_folder"] + i + ".gif")
 				else:
-					if config["uploads"][key]["save_unconverted"]:
-						img_in.save(config["uploads"][key]["unconverted_folder"] + filename + '-' + i + '.png', 'PNG')
+					if config["uploads"][key]["raw_folder"]:
+						img_in.save(config["uploads"][key]["raw_folder"] + filename + '-' + i + '.png', 'PNG')
 					img_out = img_in
 					if config["uploads"][key]["resize"]:
 						x = config["uploads"][key]["resize_w"]
@@ -72,6 +75,7 @@ class moduleClass(botmodule):
 						await message.channel.send(config["downloads"][key]["web_folder"] + i + ".png")
 			return
 		except:
+			logging.error(traceback.print_exc())
 			await message.channel.send("Problem flagging that")
 			pass
 		return
@@ -82,7 +86,7 @@ class moduleClass(botmodule):
 		uploaded = False
 		if cmd:
 			#redo logic here/check args for upload case
-			if config["uploads"] != None:
+			if config["uploads"] != None and (len(cmd["args"]) > 0 or len(message.attachments) > 0):
 				for upload in config["uploads"]:
 					if cmd["cmd"] == upload:
 						async with message.channel.typing():
