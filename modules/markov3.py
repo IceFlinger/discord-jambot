@@ -74,16 +74,14 @@ class moduleClass(botmodule):
 				exist_contexts.append((context[1], context[2], context[3]))
 		return exist_contexts
 
-	async def build_sentence(self, client, config, message):
+	async def build_sentence(self, client, config, message, own_nick, sender):
 		phrase = []
 		try:
 			chainlength = 0
 			exist_contexts = [] #look for words in the trigger sentence that we know already
-			words = message.content.split()
-			own_nick = "<@" + str(client.user.id) + ">"
-			sender = "<@" + str(message.author.id) + ">"
+			words = message.split()
 			for word in config["triggers"]:
-				if word in message.clean_content.lower():
+				if word in message.lower():
 					own_nick = word
 			for i in range(len(words)):
 				if words[i].lower() == own_nick.lower():
@@ -160,8 +158,7 @@ class moduleClass(botmodule):
 		if sentence[0] == " ":
 			sentence = sentence[1:]
 		if sentence != "":
-			await message.channel.send(sentence)
-			#return instead and message there? pass only string/list to this instead of message obj
+			return sentence
 
 	async def learn_sentence(self, client, config, message, own_nick, sender):
 		try:
@@ -218,9 +215,12 @@ class moduleClass(botmodule):
 				#t = threading.Thread(target=self.build_sentence, args=(c, e, msg, sender))
 				#t.daemon = True
 				#t.start()
+				response = ""
 				async with message.channel.typing():
-					await self.build_sentence(client, config, message)
-				self.lastmsg = time.time()
+					response = await self.build_sentence(client, config, message.content, own_nick, sender)
+				if response != "":
+					await message.channel.send(response)
+					self.lastmsg = time.time()
 			if thisbot and config["learning"] and not lametrig:
 				try:
 					await self.learn_sentence(client, config, msg, own_nick, sender)
