@@ -1,6 +1,9 @@
 from botmodule import botmodule 
 from random import choice
+from io import BytesIO
+import discord
 import pycurl
+import logging
 import sys
 import random
 import re
@@ -9,7 +12,6 @@ import string
 import threading
 import math
 
-from io import BytesIO
 #Markov chain jambot-discord module
 #By ice at scrub club discord
 
@@ -31,7 +33,7 @@ class moduleClass(botmodule):
 		"maxchain":20,
 		"sanity":50,
 		"cooldown":2,
-		"triggers": "jambot"
+		"triggers": "jambot",
 		"table_id": "jambot"
 		}
 
@@ -51,7 +53,7 @@ class moduleClass(botmodule):
 				newpairs[key] += pair[2]
 			else:
 				newpairs[key] = pair[2]
-		#print(newpairs)
+		#logging.info(newpairs)
 		sort = sorted(newpairs, key=newpairs.get, reverse=True)
 		for pair in sort:
 			roll = random.randint(1,100)
@@ -62,8 +64,8 @@ class moduleClass(botmodule):
 	async def single_word_contexts(self, client, config, word):
 		exist_contexts = []
 		single_contexts = []
-		results = await client.db_query("SELECT word1, word2, word3, freq FROM contexts3 WHERE (LOWER(word1) LIKE LOWER(?) OR LOWER(word2) LIKE LOWER(?) OR LOWER(word3) LIKE LOWER(?)) GROUP BY word1, word2, word3 ORDER BY sum(freq) DESC", (word, word, word))
-		for context in results
+		results = await client.db_query("SELECT word1, word2, word3, freq FROM  " + self.tablename + " WHERE (LOWER(word1) LIKE LOWER(?) OR LOWER(word2) LIKE LOWER(?) OR LOWER(word3) LIKE LOWER(?)) GROUP BY word1, word2, word3 ORDER BY sum(freq) DESC", (word, word, word))
+		for context in results:
 			single_contexts.append(context)
 		for context in single_contexts:
 			if context[0].lower() == word.lower() or context[1].lower() == word.lower():
@@ -78,8 +80,8 @@ class moduleClass(botmodule):
 			chainlength = 0
 			exist_contexts = [] #look for words in the trigger sentence that we know already
 			words = message.content.split()
-			own_nick = "<@" + client.user.id + ">"
-			sender = "<@" + message.author.id + ">"
+			own_nick = "<@" + str(client.user.id) + ">"
+			sender = "<@" + str(message.author.id) + ">"
 			for word in config["triggers"]:
 				if word in message.clean_content.lower():
 					own_nick = word
@@ -87,9 +89,9 @@ class moduleClass(botmodule):
 				if words[i].lower() == own_nick.lower():
 					words[i] = "#nick"
 			if len(words) == 3 and words[0] == "#nick":
-				for context in await client.db_query("SELECT word1, word2, freq FROM contexts3 WHERE (LOWER(word1) LIKE LOWER(?) AND LOWER(word2) LIKE LOWER(?)) GROUP BY word1, word2 ORDER BY sum(freq)", (words[1], words[2])):
+				for context in await client.db_query("SELECT word1, word2, freq FROM  " + self.tablename + " WHERE (LOWER(word1) LIKE LOWER(?) AND LOWER(word2) LIKE LOWER(?)) GROUP BY word1, word2 ORDER BY sum(freq)", (words[1], words[2])):
 					exist_contexts.append(context)
-				for context in await client.db_query("SELECT word2, word3, freq FROM contexts3 WHERE (LOWER(word2) LIKE LOWER(?) AND LOWER(word3) LIKE LOWER(?)) GROUP BY word2, word3 ORDER BY sum(freq)", (words[1], words[2])):
+				for context in await client.db_query("SELECT word2, word3, freq FROM  " + self.tablename + " WHERE (LOWER(word2) LIKE LOWER(?) AND LOWER(word3) LIKE LOWER(?)) GROUP BY word2, word3 ORDER BY sum(freq)", (words[1], words[2])):
 					exist_contexts.append(context)
 				if len(exist_contexts) == 0: #we didn't find that exact pair's context, so check for each word individually
 					exist_contexts+=await self.single_word_contexts(client, config, words[1])
@@ -100,13 +102,13 @@ class moduleClass(botmodule):
 				for word1, word2 in zip(words[:-1], words[1:]):
 					#for context in self.db_query("SELECT * FROM contexts WHERE (LOWER(word1) LIKE LOWER(?) AND LOWER(word2) LIKE LOWER(?)) OR (LOWER(word2) LIKE LOWER(?) AND LOWER(word3) LIKE LOWER(?)) GROUP BY word1, word2, word3 ORDER BY sum(freq)", (word1, word2, word1, word2)):
 					#	exist_contexts.append(context)
-					for context in await client.db_query("SELECT word1, word2, freq FROM contexts3 WHERE (LOWER(word1) LIKE LOWER(?) AND LOWER(word2) LIKE LOWER(?)) GROUP BY word1, word2 ORDER BY sum(freq)", (word1, word2)):
+					for context in await client.db_query("SELECT word1, word2, freq FROM  " + self.tablename + " WHERE (LOWER(word1) LIKE LOWER(?) AND LOWER(word2) LIKE LOWER(?)) GROUP BY word1, word2 ORDER BY sum(freq)", (word1, word2)):
 						exist_contexts.append(context)
-					for context in await client.db_query("SELECT word2, word3, freq FROM contexts3 WHERE (LOWER(word2) LIKE LOWER(?) AND LOWER(word3) LIKE LOWER(?)) GROUP BY word2, word3 ORDER BY sum(freq)", (word1, word2)):
+					for context in await client.db_query("SELECT word2, word3, freq FROM  " + self.tablename + " WHERE (LOWER(word2) LIKE LOWER(?) AND LOWER(word3) LIKE LOWER(?)) GROUP BY word2, word3 ORDER BY sum(freq)", (word1, word2)):
 						exist_contexts.append(context)
 			if exist_contexts:
 				phrase_seed = self.select_context(config, exist_contexts)
-				#print(phrase_seed)
+				#logging.info(phrase_seed)
 				if phrase_seed[0] == "#nick":
 					phrase.append(sender)
 				else:
@@ -116,8 +118,8 @@ class moduleClass(botmodule):
 				else:
 					phrase.append(phrase_seed[1])
 				current_pair = phrase_seed
-				while current_pair[1] != None: #begin building sentence forewards from seed word
-					next_contexts = await client.db_query("SELECT * FROM contexts3 WHERE (LOWER(word1) LIKE LOWER(?)) AND (LOWER(word2) LIKE LOWER(?)) ORDER BY freq DESC", current_pair)
+				while current_pair[1] != None: #begin building sentence forwards from seed word
+					next_contexts = await client.db_query("SELECT * FROM  " + self.tablename + " WHERE (LOWER(word1) LIKE LOWER(?)) AND (LOWER(word2) LIKE LOWER(?)) ORDER BY freq DESC", current_pair)
 					if len(next_contexts) == 0:
 						break
 					next_link = next_contexts[-1]
@@ -133,10 +135,10 @@ class moduleClass(botmodule):
 						current_pair = (next_link[1], None)
 					else:
 						current_pair = (next_link[1], next_link[2])
-				#print(phrase, end=" ",flush=True)
+				#logging.info(phrase, end=" ",flush=True)
 				current_pair = phrase_seed
 				while current_pair[0] != None: #begin building sentence backwards from seed word
-					next_contexts = await self.db_query("SELECT * FROM contexts3 WHERE (LOWER(word2) LIKE LOWER(?)) AND (LOWER(word3) LIKE LOWER(?)) ORDER BY freq DESC", current_pair)
+					next_contexts = await self.db_query("SELECT * FROM  " + self.tablename + " WHERE (LOWER(word2) LIKE LOWER(?)) AND (LOWER(word3) LIKE LOWER(?)) ORDER BY freq DESC", current_pair)
 					if len(next_contexts) == 0:
 						break
 					next_link = next_contexts[-1]
@@ -159,17 +161,16 @@ class moduleClass(botmodule):
 			sentence = sentence[1:]
 		if sentence != "":
 			await message.channel.send(sentence)
+			#return instead and message there? pass only string/list to this instead of message obj
 
-	async def learn_sentence(self, client, config, message):
+	async def learn_sentence(self, client, config, message, own_nick, sender):
 		try:
-			#print(words)
-			words = message.content.split()
+			#logging.info(words)
+			words = message.split()
 			if len(words)>2:
 				named = False
-				own_nick = "<@" + client.user.id + ">"
-				sender = "<@" + message.author.id + ">"
 				for word in config["triggers"]:
-					if word in message.clean_content.lower():
+					if word in message.lower():
 						own_nick = word
 				for word in range(len(words)):
 					if words[word].lower() in own_nick.lower():
@@ -178,18 +179,18 @@ class moduleClass(botmodule):
 				index = 0
 				if not (named and len(words)<5):
 					if (len(words) > 3):
-						await client.db_query("INSERT OR IGNORE INTO contexts3 (word2, word3) VALUES (?, ?)", (words[0], words[1]))
-						await client.db_query("UPDATE contexts3 SET freq = freq + 1 WHERE word2=? AND word3=? AND word1 is ''", (words[0], words[1]))
+						await client.db_query("INSERT OR IGNORE INTO  " + self.tablename + " (word2, word3) VALUES (?, ?)", (words[0], words[1]))
+						await client.db_query("UPDATE  " + self.tablename + " SET freq = freq + 1 WHERE word2=? AND word3=? AND word1 is ''", (words[0], words[1]))
 					while index < len(words)-2:
 						word1 = words[index]
 						word2 = words[index+1]
 						word3 = words[index+2]
-						await client.db_query("INSERT OR IGNORE INTO contexts3 (word1, word2, word3) VALUES (?, ?, ?)", (word1, word2, word3))
-						await client.db_query("UPDATE contexts3 SET freq = freq + 1 WHERE word1=? AND word2=? AND word3=?", (word1, word2, word3))
+						await client.db_query("INSERT OR IGNORE INTO  " + self.tablename + " (word1, word2, word3) VALUES (?, ?, ?)", (word1, word2, word3))
+						await client.db_query("UPDATE  " + self.tablename + " SET freq = freq + 1 WHERE word1=? AND word2=? AND word3=?", (word1, word2, word3))
 						index += 1
 					if (len(words) > 3):
-						await client.db_query("INSERT OR IGNORE INTO contexts3 (word1, word2) VALUES (?, ?)", (words[-2], words[-1]))
-						await client.db_query("UPDATE contexts3 SET freq = freq + 1 WHERE word1=? AND word2=? AND word3 is ''", (words[-2], words[-1]))
+						await client.db_query("INSERT OR IGNORE INTO  " + self.tablename + " (word1, word2) VALUES (?, ?)", (words[-2], words[-1]))
+						await client.db_query("UPDATE  " + self.tablename + " SET freq = freq + 1 WHERE word1=? AND word2=? AND word3 is ''", (words[-2], words[-1]))
 		except:
 			raise
 
@@ -200,8 +201,8 @@ class moduleClass(botmodule):
 				await self.do_command(client, config, message)
 		else:
 			msg = " "
-			own_nick = "<@" + client.user.id + ">"
-			sender = "<@" + message.author.id + ">"
+			own_nick = "<@" + str(client.user.id) + ">"
+			sender = "<@" + str(message.author.id) + ">"
 			thisbot = True
 			lametrig = False
 			msg = mangle_line(message.content)
@@ -218,73 +219,98 @@ class moduleClass(botmodule):
 				#t.daemon = True
 				#t.start()
 				async with message.channel.typing():
-					await self.build_sentence(client, config, msg)
+					await self.build_sentence(client, config, message)
 				self.lastmsg = time.time()
 			if thisbot and config["learning"] and not lametrig:
 				try:
-					await self.learn_sentence(client, config, msg)
+					await self.learn_sentence(client, config, msg, own_nick, sender)
 					self.db_commit()
 				except:
 					pass
 
-	def do_command(self, client, config, message):
+	async def do_command(self, client, config, message):
 		cmd = await client.get_cmd(message)
-		command = cmd["command"]
+		command = cmd["cmd"]
 		args = cmd["args"]
 		admin = cmd["admin"]
-		if command=="feed" and admin and args:
-			print("Downloading: " + args[0])
-			await message.channel.send("Downloading: " + args[0])
-			textbytes = BytesIO()
-			try:
-				textconn = pycurl.Curl()
-				textconn.setopt(textconn.URL, args[0])
-				textconn.setopt(textconn.WRITEDATA, textbytes)
-				textconn.perform()
-				textconn.close()
-				text = textbytes.getvalue().decode('iso-8859-1').split('\n')
-				linecount = 0
-				print("Learning...")
-				await message.channel.send("Learning")
+		if command=="feed" and admin:
+			links = []
+			if args:
+				links = re.findall(r'(https?://\S+)', ' '.join(args))
+			if len(links) > 0:
+				logging.info("Downloading: " + links[0])
+				await message.channel.send("Downloading: " + links[0])
+				textbytes = BytesIO()
 				try:
-					multi = 1
-					if len(args)>1:
-						multi = int(args[1])
-					for line in text:
-						line = mangle_line(line)
-						await self.learn_sentence(client, config, line)
-						linecount += 1
-						if ((linecount%1000)==0):
-							print(str(linecount/1000).split(".")[0] + "k lines, ", end="" , flush=True)
-					await client.db_commit()
+					textconn = pycurl.Curl()
+					textconn.setopt(textconn.URL, links[0])
+					textconn.setopt(textconn.WRITEDATA, textbytes)
+					textconn.perform()
+					textconn.close()
+					text = textbytes.getvalue().decode('iso-8859-1').split('\n')
+					linecount = 0
+					logging.info("Learning...")
+					await message.channel.send("Learning")
+					try:
+						for line in text:
+							line = mangle_line(line)
+							own_nick = " "
+							sender = " "
+							await self.learn_sentence(client, config, line, own_nick, sender)
+							linecount += 1
+							if ((linecount%1000)==0):
+								logging.info(str(linecount/1000).split(".")[0] + "k lines, ", end="" , flush=True)
+						await client.db_commit()
+					except:
+						await message.channel.send("Interrupted while learning from file")
+						raise
+					try:
+						logging.info("Learned from " + str(linecount) + " lines")
+						await message.channel.send("Learned from " + str(linecount) + " lines")
+						await client.db_commit()
+						logging.info("Commited to DB")
+					except:
+						pass
 				except:
-					await message.channel.send("Interrupted while learning from file (Something else accessing DB?)")
+					await message.channel.send("Couldn't download file.")
 					raise
-				try:
-					print("Learned from " + str(linecount) + " lines")
-					await message.channel.send("Learned from " + str(linecount) + " lines")
-					await client.db_commit()
-					print("Commited to DB")
-				except:
-					pass
-			except:
-				await message.channel.send("Couldn't download file.")
-				raise
+			else:
+				hist = 1000
+				if len(args) > 1:
+					channel = discord.utils.get(client.get_all_channels(), id=int(args[0]))
+					hist = int(args[1])
+				else:
+					channel = message.channel
+					hist = int(args[0])
+				logging.info("Learning...")
+				await message.channel.send("Learning from " + channel.name)
+				linecount = 0
+				async for message in channel.history(limit=hist):
+					line = mangle_line(message.content)
+					own_nick = "<@" + str(client.user.id) + ">"
+					sender = "<@" + str(message.author.id) + ">"
+					await self.learn_sentence(client, config, line, own_nick, sender)
+					linecount += 1
+					if ((linecount%1000)==0):
+						logging.info(str(linecount/1000).split(".")[0] + "k lines, ", end="" , flush=True)
+				await client.db_commit()
+				await message.channel.send("Learned from " + str(linecount) + " lines")
+
 		elif command=="words":
-			words = await client.db_query("SELECT COUNT(*) FROM (SELECT DISTINCT LOWER(word1) FROM contexts3)")[0][0]
-			contexts = await db_query("SELECT sum(freq) FROM contexts3")[0][0]
+			words = await client.db_query("SELECT COUNT(*) FROM (SELECT DISTINCT LOWER(word1) FROM  " + self.tablename + ")")[0][0]
+			contexts = await db_query("SELECT sum(freq) FROM  " + self.tablename)[0][0]
 			message.channel.send("Currently have " + str(words) + " words and " + str(contexts)  + " contexts.")
 		elif command=="known" and args:
 			for word in args[:8]:
-				contexts = await client.db_query("SELECT sum(freq) FROM contexts3 WHERE LOWER(word1) LIKE LOWER(?) OR LOWER(word2) LIKE LOWER(?) OR LOWER(word3) LIKE LOWER(?)", (word, word, word))[0][0]
+				contexts = await client.db_query("SELECT sum(freq) FROM  " + self.tablename + " WHERE LOWER(word1) LIKE LOWER(?) OR LOWER(word2) LIKE LOWER(?) OR LOWER(word3) LIKE LOWER(?)", (word, word, word))[0][0]
 				if contexts != None:
 					await message.channel.send("I know " + word + " in " + str(contexts)  + " contexts.")
 				else:
 					await message.channel.send("I don't know " + word)
 		elif command=="clean" and admin:
-			contexts = await client.db_query("SELECT sum(freq) FROM contexts3")[0][0]
+			contexts = await client.db_query("SELECT sum(freq) FROM  " + self.tablename)[0][0]
 			await message.channel.send("Used to have " + str(contexts)  + " contexts.")
 			await client.db_query("UPDATE contexts SET freq = cast((freq+1)/2 as int)")
-			contexts = await client.db_query("SELECT sum(freq) FROM contexts3")[0][0]
+			contexts = await client.db_query("SELECT sum(freq) FROM  " + self.tablename)[0][0]
 			await client.db_commit()
 			await message.channel.send("Now have " + str(contexts)  + " contexts.")
