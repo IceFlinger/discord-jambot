@@ -15,27 +15,33 @@ import math
 #Markov chain jambot-discord module
 #By ice at scrub club discord
 
+mentionmatch = re.compile(r'^<@!?\d+>$')
+linkmatch = re.compile(r'(https?://\S+)')
+
 def mangle_line(line):
-	links = re.findall(r'(https?://\S+)', line) 
+	links = linkmatch.findall(line) 
 	f = string.ascii_letters + string.digits + "():<>[].,!?/-^%$#@ "
 	line = ' '.join(w for w in line.split() if w not in links) #Remove URLs
 	line = ' '.join(w for w in line.split() if w[0] not in "[\"(") #Remove timestamp type stuff and quotes
 	line = ' '.join(w for w in line.split() if w[-1] not in "\;\"%") #Remove broken words
-	line = ' '.join(w for w in line.split() if not len(w)>26) #Remove long stuff
+	#line = ' '.join(w for w in line.split() if not len(w)>35) #Remove long stuff
 	#line = ''.join(c for c in line if c in f) #Filter whole string with f chars
+	#logging.info(line)
 	return line
 
 class moduleClass(botmodule):
 	def default_config(self):
 		return {"replyrate":0.01,
 		"learning":False,
-		"mentionreplyrate":1,
 		"maxchain":20,
 		"sanity":50,
 		"cooldown":2,
-		"triggers": "jambot",
+		"triggers": ["jambot"],
 		"table_id": "jambot"
 		}
+
+	def on_init(self):
+		self.logger = logging.getLogger("jambot.markov3")
 
 	async def on_connect(self, client, config):
 		self.tablename = "markov_" + config["table_id"]
@@ -74,19 +80,17 @@ class moduleClass(botmodule):
 				exist_contexts.append((context[1], context[2], context[3]))
 		return exist_contexts
 
-	async def build_sentence(self, client, config, message, own_nick, sender):
+	async def build_sentence(self, client, config, message, sender, channel):
+		#logging.info("Building sentence")
 		phrase = []
 		try:
 			chainlength = 0
 			exist_contexts = [] #look for words in the trigger sentence that we know already
 			words = message.split()
-			for word in config["triggers"]:
-				if word in message.lower():
-					own_nick = word
-			for i in range(len(words)):
-				if words[i].lower() == own_nick.lower():
-					words[i] = "#nick"
-			if len(words) == 3 and words[0] == "#nick":
+			for word in range(len(words)):
+				if (words[word].lower() in config["triggers"]) or mentionmatch.match(words[word]):
+					words[word]="<@#mention>"
+			if len(words) == 3 and words[0] == "<@#mention>":
 				for context in await client.db_query("SELECT word1, word2, freq FROM  " + self.tablename + " WHERE (LOWER(word1) LIKE LOWER(?) AND LOWER(word2) LIKE LOWER(?)) GROUP BY word1, word2 ORDER BY sum(freq)", (words[1], words[2])):
 					exist_contexts.append(context)
 				for context in await client.db_query("SELECT word2, word3, freq FROM  " + self.tablename + " WHERE (LOWER(word2) LIKE LOWER(?) AND LOWER(word3) LIKE LOWER(?)) GROUP BY word2, word3 ORDER BY sum(freq)", (words[1], words[2])):
@@ -94,7 +98,7 @@ class moduleClass(botmodule):
 				if len(exist_contexts) == 0: #we didn't find that exact pair's context, so check for each word individually
 					exist_contexts+=await self.single_word_contexts(client, config, words[1])
 					exist_contexts+=await self.single_word_contexts(client, config, words[2])
-			elif len(words) == 2 and words[0] == "#nick":
+			elif len(words) == 2 and words[0] == "<@#mention>":
 				exist_contexts+=await self.single_word_contexts(client, config, words[1])
 			else:
 				for word1, word2 in zip(words[:-1], words[1:]):
@@ -105,87 +109,79 @@ class moduleClass(botmodule):
 					for context in await client.db_query("SELECT word2, word3, freq FROM  " + self.tablename + " WHERE (LOWER(word2) LIKE LOWER(?) AND LOWER(word3) LIKE LOWER(?)) GROUP BY word2, word3 ORDER BY sum(freq)", (word1, word2)):
 						exist_contexts.append(context)
 			if exist_contexts:
-				phrase_seed = self.select_context(config, exist_contexts)
-				#logging.info(phrase_seed)
-				if phrase_seed[0] == "#nick":
-					phrase.append(sender)
-				else:
-					phrase.append(phrase_seed[0])
-				if phrase_seed[1] == "#nick":
-					phrase.append(sender)
-				else:
-					phrase.append(phrase_seed[1])
-				current_pair = phrase_seed
-				while current_pair[1] != None: #begin building sentence forwards from seed word
-					next_contexts = await client.db_query("SELECT * FROM  " + self.tablename + " WHERE (LOWER(word1) LIKE LOWER(?)) AND (LOWER(word2) LIKE LOWER(?)) ORDER BY freq DESC", current_pair)
-					if len(next_contexts) == 0:
-						break
-					next_link = next_contexts[-1]
-					for context in next_contexts:
-						roll = random.randint(1,100)
-						if roll <= config["sanity"]:
-							next_link = context
-					if next_link[2] == "#nick":
+				async with channel.typing():
+					phrase_seed = self.select_context(config, exist_contexts)
+					#logging.info(phrase_seed)
+					if phrase_seed[0] == "<@#mention>":
 						phrase.append(sender)
 					else:
-						phrase.append(next_link[2])
-					if len(phrase) > config["maxchain"]:
-						current_pair = (next_link[1], None)
+						phrase.append(phrase_seed[0])
+					if phrase_seed[1] == "<@#mention>":
+						phrase.append(sender)
 					else:
-						current_pair = (next_link[1], next_link[2])
-				#logging.info(phrase, end=" ",flush=True)
-				current_pair = phrase_seed
-				while current_pair[0] != None: #begin building sentence backwards from seed word
-					next_contexts = await self.db_query("SELECT * FROM  " + self.tablename + " WHERE (LOWER(word2) LIKE LOWER(?)) AND (LOWER(word3) LIKE LOWER(?)) ORDER BY freq DESC", current_pair)
-					if len(next_contexts) == 0:
-						break
-					next_link = next_contexts[-1]
-					for context in next_contexts:
-						roll = random.randint(1,100)
-						if roll <= config["sanity"]:
-							next_link = context
-					if next_link[0] == "#nick":
-						phrase.insert(0, sender)
-					else:
-						phrase.insert(0, next_link[0])
-					if len(phrase) > config["maxchain"]:
-						current_pair = (None, next_link[1])
-					else:
-						current_pair = (next_link[0], next_link[1])
+						phrase.append(phrase_seed[1])
+					current_pair = phrase_seed
+					while current_pair[1] != None: #begin building sentence forwards from seed word
+						next_contexts = await client.db_query("SELECT * FROM  " + self.tablename + " WHERE (LOWER(word1) LIKE LOWER(?)) AND (LOWER(word2) LIKE LOWER(?)) ORDER BY freq DESC", current_pair)
+						if len(next_contexts) == 0:
+							break
+						next_link = next_contexts[-1]
+						for context in next_contexts: 
+							roll = random.randint(1,100)
+							if roll <= config["sanity"]:
+								next_link = context
+						if next_link[2] == "<@#mention>":
+							phrase.append(sender)
+						else:
+							phrase.append(next_link[2])
+						if len(phrase) > config["maxchain"]:
+							current_pair = (next_link[1], None)
+						else:
+							current_pair = (next_link[1], next_link[2])
+					current_pair = phrase_seed
+					while current_pair[0] != None: #begin building sentence backwards from seed word
+						next_contexts = await client.db_query("SELECT * FROM  " + self.tablename + " WHERE (LOWER(word2) LIKE LOWER(?)) AND (LOWER(word3) LIKE LOWER(?)) ORDER BY freq DESC", current_pair)
+						if len(next_contexts) == 0:
+							break
+						next_link = next_contexts[-1]
+						for context in next_contexts:
+							roll = random.randint(1,100)
+							if roll <= config["sanity"]:
+								next_link = context
+						if next_link[0] == "<@#mention>":
+							phrase.insert(0, sender)
+						else:
+							phrase.insert(0, next_link[0])
+						if len(phrase) > config["maxchain"]:
+							current_pair = (None, next_link[1])
+						else:
+							current_pair = (next_link[0], next_link[1])
 		except:
 			raise
 		sentence = " ".join(phrase)
-		if sentence[0] == " ":
-			sentence = sentence[1:]
-		if sentence != "":
-			return sentence
+		return sentence
 
-	async def learn_sentence(self, client, config, message, own_nick, sender):
+	async def learn_sentence(self, client, config, message):
 		try:
 			#logging.info(words)
 			words = message.split()
-			if len(words)>2:
-				named = False
-				for word in config["triggers"]:
-					if word in message.lower():
-						own_nick = word
-				for word in range(len(words)):
-					if words[word].lower() in own_nick.lower():
-						named = True
-						words[word]="#nick"
+			wlen = len(words)
+			if wlen>2:
+				mention = False
+				for word in range(wlen):
+					if (words[word].lower() in config["triggers"]) or mentionmatch.match(words[word]):
+						mention = True
+						words[word]="<@#mention>"
 				index = 0
-				if not (named and len(words)<5):
-					if (len(words) > 3):
+				if not (mention and wlen<5):
+					if wlen > 3:
 						await client.db_query("INSERT OR IGNORE INTO  " + self.tablename + " (word2, word3) VALUES (?, ?)", (words[0], words[1]))
 						await client.db_query("UPDATE  " + self.tablename + " SET freq = freq + 1 WHERE word2=? AND word3=? AND word1 is ''", (words[0], words[1]))
-					while index < len(words)-2:
-						word1 = words[index]
-						word2 = words[index+1]
-						word3 = words[index+2]
-						await client.db_query("INSERT OR IGNORE INTO  " + self.tablename + " (word1, word2, word3) VALUES (?, ?, ?)", (word1, word2, word3))
-						await client.db_query("UPDATE  " + self.tablename + " SET freq = freq + 1 WHERE word1=? AND word2=? AND word3=?", (word1, word2, word3))
+					while index < wlen-2:
+						await client.db_query("INSERT OR IGNORE INTO  " + self.tablename + " (word1, word2, word3) VALUES (?, ?, ?)", (words[index], words[index+1], words[index+2]))
+						await client.db_query("UPDATE  " + self.tablename + " SET freq = freq + 1 WHERE word1=? AND word2=? AND word3=?", (words[index], words[index+1], words[index+2]))
 						index += 1
-					if (len(words) > 3):
+					if wlen > 3:
 						await client.db_query("INSERT OR IGNORE INTO  " + self.tablename + " (word1, word2) VALUES (?, ?)", (words[-2], words[-1]))
 						await client.db_query("UPDATE  " + self.tablename + " SET freq = freq + 1 WHERE word1=? AND word2=? AND word3 is ''", (words[-2], words[-1]))
 		except:
@@ -193,40 +189,33 @@ class moduleClass(botmodule):
 
 	async def on_message(self, client, config, message):
 		cmd = await client.get_cmd(message)
-		if cmd:
-			async with message.channel.typing():
+		sender = "<@!" + str(message.author.id) + ">"
+		if not message.author.id == client.user.id:
+			if cmd:
 				await self.do_command(client, config, message)
-		else:
-			msg = " "
-			own_nick = "<@" + str(client.user.id) + ">"
-			sender = "<@" + str(message.author.id) + ">"
-			thisbot = True
-			lametrig = False
-			msg = mangle_line(message.content)
-			for word in config["triggers"]:
-				if word in message.clean_content.lower():
-					own_nick = word
-			roll = config["replyrate"]>random.random()
-			nickroll = config["mentionreplyrate"]>random.random()
-			for word in config["triggers"]:
-				named = (own_nick.lower() in msg.lower()) or (word.lower() in msg.lower())
-			cooled = time.time()>(self.lastmsg+config["cooldown"])
-			if (roll or (nickroll and named)) and cooled:
-				#t = threading.Thread(target=self.build_sentence, args=(c, e, msg, sender))
-				#t.daemon = True
-				#t.start()
-				response = ""
-				async with message.channel.typing():
-					response = await self.build_sentence(client, config, message.content, own_nick, sender)
-				if response != "":
-					await message.channel.send(response)
-					self.lastmsg = time.time()
-			if thisbot and config["learning"] and not lametrig:
-				try:
-					await self.learn_sentence(client, config, msg, own_nick, sender)
-					self.db_commit()
-				except:
-					pass
+			else:
+				msg = " "
+				msg = mangle_line(message.content)
+				roll = config["replyrate"]>random.random()
+				named = False
+				if str(client.user.id) in msg:
+					named = True
+				for word in config["triggers"]:
+					if word in msg.lower():
+						named = True
+				cooled = time.time()>(self.lastmsg+config["cooldown"])
+				if (roll or named) and cooled:
+					response = ""
+					response = await self.build_sentence(client, config, msg, sender, message.channel)
+					if response != "":
+						await message.channel.send(response)
+						self.lastmsg = time.time()
+				if config["learning"]:
+					try:
+						await self.learn_sentence(client, config, msg)
+						await client.db_commit()
+					except:
+						pass
 
 	async def do_command(self, client, config, message):
 		cmd = await client.get_cmd(message)
@@ -285,14 +274,12 @@ class moduleClass(botmodule):
 				logging.info("Learning...")
 				await message.channel.send("Learning from " + channel.name)
 				linecount = 0
-				async for message in channel.history(limit=hist):
-					line = mangle_line(message.content)
-					own_nick = "<@" + str(client.user.id) + ">"
-					sender = "<@" + str(message.author.id) + ">"
-					await self.learn_sentence(client, config, line, own_nick, sender)
+				async for hist in channel.history(limit=hist):
+					line = mangle_line(hist.content)
+					await self.learn_sentence(client, config, line)
 					linecount += 1
 					if ((linecount%1000)==0):
-						logging.info(str(linecount/1000).split(".")[0] + "k lines, ", end="" , flush=True)
+						logging.info(str(linecount/1000).split(".")[0] + "k lines")
 				await client.db_commit()
 				await message.channel.send("Learned from " + str(linecount) + " lines")
 
