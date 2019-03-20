@@ -298,8 +298,8 @@ class moduleClass(botmodule):
 				logging.info("Learning...")
 				await message.channel.send("Learning from " + channel.name)
 				linecount = 0
-				async for hist in channel.history(limit=hist):
-					line = mangle_line(hist.content)
+				async for histm in channel.history(limit=hist):
+					line = mangle_line(histm.content)
 					await self.learn_sentence(client, config, line)
 					linecount += 1
 					if ((linecount%1000)==0):
