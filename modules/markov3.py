@@ -37,7 +37,8 @@ class moduleClass(botmodule):
 		"sanity":50,
 		"cooldown":2,
 		"triggers": ["jambot"],
-		"table_id": "jambot"
+		"table_id": "jambot",
+		"articles": ["<#sender>", "<#nick>", "<#@ping>", "you", "she", "he", "they"]
 		}
 
 	def on_init(self):
@@ -45,7 +46,8 @@ class moduleClass(botmodule):
 
 	async def on_connect(self, client, config):
 		self.tablename = "markov_" + config["table_id"]
-		query = "CREATE TABLE IF NOT EXISTS " + self.tablename + " (word1 text DEFAULT '', word2 text DEFAULT '', word3 text DEFAULT '', freq int DEFAULT 0, UNIQUE(word1, word2, word3))"
+		query = "CREATE TABLE IF NOT EXISTS " + self.tablename + " (word1 text DEFAULT '', word2 text DEFAULT '', word3 text DEFAULT '',\
+		 freq int DEFAULT 0, UNIQUE(word1, word2, word3))"
 		await client.db_query(query)
 		await client.db_commit()
 		self.nickreply = False
@@ -70,7 +72,8 @@ class moduleClass(botmodule):
 	async def single_word_contexts(self, client, config, word):
 		exist_contexts = []
 		single_contexts = []
-		results = await client.db_query("SELECT word1, word2, word3, freq FROM  " + self.tablename + " WHERE (LOWER(word1) LIKE LOWER(?) OR LOWER(word2) LIKE LOWER(?) OR LOWER(word3) LIKE LOWER(?)) GROUP BY word1, word2, word3 ORDER BY sum(freq) DESC", (word, word, word))
+		results = await client.db_query("SELECT word1, word2, word3, freq FROM  " + self.tablename + " WHERE (LOWER(word1) LIKE LOWER(?)\
+		 OR LOWER(word2) LIKE LOWER(?) OR LOWER(word3) LIKE LOWER(?)) GROUP BY word1, word2, word3 ORDER BY sum(freq) DESC", (word, word, word))
 		for context in results:
 			single_contexts.append(context)
 		for context in single_contexts:
@@ -91,9 +94,11 @@ class moduleClass(botmodule):
 				if (words[word].lower() in config["triggers"]) or mentionmatch.match(words[word]):
 					words[word]="<@#mention>"
 			if len(words) == 3 and words[0] == "<@#mention>":
-				for context in await client.db_query("SELECT word1, word2, freq FROM  " + self.tablename + " WHERE (LOWER(word1) LIKE LOWER(?) AND LOWER(word2) LIKE LOWER(?)) GROUP BY word1, word2 ORDER BY sum(freq)", (words[1], words[2])):
+				for context in await client.db_query("SELECT word1, word2, freq FROM  " + self.tablename + " WHERE (LOWER(word1) \
+					LIKE LOWER(?) AND LOWER(word2) LIKE LOWER(?)) GROUP BY word1, word2 ORDER BY sum(freq)", (words[1], words[2])):
 					exist_contexts.append(context)
-				for context in await client.db_query("SELECT word2, word3, freq FROM  " + self.tablename + " WHERE (LOWER(word2) LIKE LOWER(?) AND LOWER(word3) LIKE LOWER(?)) GROUP BY word2, word3 ORDER BY sum(freq)", (words[1], words[2])):
+				for context in await client.db_query("SELECT word2, word3, freq FROM  " + self.tablename + " WHERE (LOWER(word2) \
+					LIKE LOWER(?) AND LOWER(word3) LIKE LOWER(?)) GROUP BY word2, word3 ORDER BY sum(freq)", (words[1], words[2])):
 					exist_contexts.append(context)
 				if len(exist_contexts) == 0: #we didn't find that exact pair's context, so check for each word individually
 					exist_contexts+=await self.single_word_contexts(client, config, words[1])
@@ -102,11 +107,15 @@ class moduleClass(botmodule):
 				exist_contexts+=await self.single_word_contexts(client, config, words[1])
 			else:
 				for word1, word2 in zip(words[:-1], words[1:]):
-					#for context in self.db_query("SELECT * FROM contexts WHERE (LOWER(word1) LIKE LOWER(?) AND LOWER(word2) LIKE LOWER(?)) OR (LOWER(word2) LIKE LOWER(?) AND LOWER(word3) LIKE LOWER(?)) GROUP BY word1, word2, word3 ORDER BY sum(freq)", (word1, word2, word1, word2)):
+					#for context in self.db_query("SELECT * FROM contexts WHERE (LOWER(word1) LIKE LOWER(?) AND LOWER(word2) LIKE LOWER(?))\
+					# OR (LOWER(word2) LIKE LOWER(?) AND LOWER(word3) LIKE LOWER(?)) GROUP BY word1, word2, word3 ORDER BY sum(freq)",\
+					# (word1, word2, word1, word2)):
 					#	exist_contexts.append(context)
-					for context in await client.db_query("SELECT word1, word2, freq FROM  " + self.tablename + " WHERE (LOWER(word1) LIKE LOWER(?) AND LOWER(word2) LIKE LOWER(?)) GROUP BY word1, word2 ORDER BY sum(freq)", (word1, word2)):
+					for context in await client.db_query("SELECT word1, word2, freq FROM  " + self.tablename + " WHERE (LOWER(word1)\
+					 LIKE LOWER(?) AND LOWER(word2) LIKE LOWER(?)) GROUP BY word1, word2 ORDER BY sum(freq)", (word1, word2)):
 						exist_contexts.append(context)
-					for context in await client.db_query("SELECT word2, word3, freq FROM  " + self.tablename + " WHERE (LOWER(word2) LIKE LOWER(?) AND LOWER(word3) LIKE LOWER(?)) GROUP BY word2, word3 ORDER BY sum(freq)", (word1, word2)):
+					for context in await client.db_query("SELECT word2, word3, freq FROM  " + self.tablename + " WHERE (LOWER(word2)\
+					 LIKE LOWER(?) AND LOWER(word3) LIKE LOWER(?)) GROUP BY word2, word3 ORDER BY sum(freq)", (word1, word2)):
 						exist_contexts.append(context)
 			if exist_contexts:
 				async with channel.typing():
@@ -122,7 +131,8 @@ class moduleClass(botmodule):
 						phrase.append(phrase_seed[1])
 					current_pair = phrase_seed
 					while current_pair[1] != None: #begin building sentence forwards from seed word
-						next_contexts = await client.db_query("SELECT * FROM  " + self.tablename + " WHERE (LOWER(word1) LIKE LOWER(?)) AND (LOWER(word2) LIKE LOWER(?)) ORDER BY freq DESC", current_pair)
+						next_contexts = await client.db_query("SELECT * FROM  " + self.tablename + " WHERE (LOWER(word1) LIKE LOWER(?))\
+						 AND (LOWER(word2) LIKE LOWER(?)) ORDER BY freq DESC", current_pair)
 						if len(next_contexts) == 0:
 							break
 						next_link = next_contexts[-1]
@@ -140,7 +150,8 @@ class moduleClass(botmodule):
 							current_pair = (next_link[1], next_link[2])
 					current_pair = phrase_seed
 					while current_pair[0] != None: #begin building sentence backwards from seed word
-						next_contexts = await client.db_query("SELECT * FROM  " + self.tablename + " WHERE (LOWER(word2) LIKE LOWER(?)) AND (LOWER(word3) LIKE LOWER(?)) ORDER BY freq DESC", current_pair)
+						next_contexts = await client.db_query("SELECT * FROM  " + self.tablename + " WHERE (LOWER(word2) LIKE LOWER(?))\
+						 AND (LOWER(word3) LIKE LOWER(?)) ORDER BY freq DESC", current_pair)
 						if len(next_contexts) == 0:
 							break
 						next_link = next_contexts[-1]
@@ -176,20 +187,33 @@ class moduleClass(botmodule):
 				if not (mention and wlen<5):
 					if wlen > 3:
 						await client.db_query("INSERT OR IGNORE INTO  " + self.tablename + " (word2, word3) VALUES (?, ?)", (words[0], words[1]))
-						await client.db_query("UPDATE  " + self.tablename + " SET freq = freq + 1 WHERE word2=? AND word3=? AND word1 is ''", (words[0], words[1]))
+						await client.db_query("UPDATE  " + self.tablename + " SET freq = freq + 1 WHERE word2=? AND word3=? AND word1 is ''",\
+						 (words[0], words[1]))
 					while index < wlen-2:
-						await client.db_query("INSERT OR IGNORE INTO  " + self.tablename + " (word1, word2, word3) VALUES (?, ?, ?)", (words[index], words[index+1], words[index+2]))
-						await client.db_query("UPDATE  " + self.tablename + " SET freq = freq + 1 WHERE word1=? AND word2=? AND word3=?", (words[index], words[index+1], words[index+2]))
+						await client.db_query("INSERT OR IGNORE INTO  " + self.tablename + " (word1, word2, word3) VALUES (?, ?, ?)",\
+						 (words[index], words[index+1], words[index+2]))
+						await client.db_query("UPDATE  " + self.tablename + " SET freq = freq + 1 WHERE word1=? AND word2=? AND word3=?",\
+						 (words[index], words[index+1], words[index+2]))
 						index += 1
 					if wlen > 3:
 						await client.db_query("INSERT OR IGNORE INTO  " + self.tablename + " (word1, word2) VALUES (?, ?)", (words[-2], words[-1]))
-						await client.db_query("UPDATE  " + self.tablename + " SET freq = freq + 1 WHERE word1=? AND word2=? AND word3 is ''", (words[-2], words[-1]))
+						await client.db_query("UPDATE  " + self.tablename + " SET freq = freq + 1 WHERE word1=? AND word2=? AND word3 is ''",\
+						 (words[-2], words[-1]))
 		except:
 			raise
 
 	async def on_message(self, client, config, message):
 		cmd = await client.get_cmd(message)
-		sender = "<@!" + str(message.author.id) + ">"
+		sender = random.choice(config["articles"])
+		if sender == "<#@ping>":
+			sender = "<@!" + str(message.author.id) + ">"
+		elif sender == "<#sender>":
+			sender = message.author.name
+		elif sender == "<#nick>": #and channel is a textchannel?
+			if isinstance(message.author, discord.Member):
+				sender = message.author.nick
+			else:
+				sender = message.author.name
 		if not message.author.id == client.user.id:
 			if cmd:
 				await self.do_command(client, config, message)
@@ -289,7 +313,8 @@ class moduleClass(botmodule):
 			message.channel.send("Currently have " + str(words) + " words and " + str(contexts)  + " contexts.")
 		elif command=="known" and args:
 			for word in args[:8]:
-				contexts = await client.db_query("SELECT sum(freq) FROM  " + self.tablename + " WHERE LOWER(word1) LIKE LOWER(?) OR LOWER(word2) LIKE LOWER(?) OR LOWER(word3) LIKE LOWER(?)", (word, word, word))[0][0]
+				contexts = await client.db_query("SELECT sum(freq) FROM  " + self.tablename + " WHERE LOWER(word1) LIKE LOWER(?) OR LOWER(word2)\
+				 LIKE LOWER(?) OR LOWER(word3) LIKE LOWER(?)", (word, word, word))[0][0]
 				if contexts != None:
 					await message.channel.send("I know " + word + " in " + str(contexts)  + " contexts.")
 				else:

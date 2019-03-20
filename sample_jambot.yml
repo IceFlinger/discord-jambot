@@ -1,30 +1,60 @@
-database: jambot.db
-command_prefix: '>'
 version: discord-jambot 0.1
 token: reallylongdiscordtoken
-owner: 123412341234
-global_modules: ["global_sample_module", "general_sample"]
-
-global_sample_module:
-  setting: test
-
-general_sample:
-  setting: test
-
+owner: 123456789
+database: jambot.db
+command_prefix: '>'
+global_modules:
+- monitor
+monitor:
+  level: 20
+  message_level: 20
+  raw_level: 10
 servers:
-  ##server name of 1234 output from save command##
-  1234123412341234:
-    server_modules: ["server_sample_module", "general_sample"]
-    #modules loaded to server scope will override global modules within its server
-    server_sample_module:
-      setting: test
-    general_sample:
-      setting: test
+  1234:
+    server_modules:
+    - flags
+    - markov3
+    flags:
+      uploads:
+        flag:
+          local_folder: /srv/www/images/
+          max_filesize: 4000000
+          raw_folder: /srv/www/rawimages/
+          resize: false
+      downloads:
+        flag:
+          cache: true
+          web_folder: https://example.com/images/
+    markov3:
+      table_id: jambot
+      learning: true
+      replyrate: 0.05
+      cooldown: 2
+      maxchain: 20
+      sanity: 50
+      triggers:
+      - jambot
+      articles:
+      - <#sender>
+      - <#nick>
+      - <#@ping>
+      - you
+      - she
+      - he
+      - they
+  567898:
     channels:
-      ##channel name of 2345 output from save command##
-      1234123412342134:
-        channel_modules: ["channel_sample_module", "general_sample"]
-        channel_sample_module:
-          setting: test
-        general_sample:
-          setting: test
+      987654:
+        channel_modules:
+          - markov3
+        markov3:
+          table_id: otherchan
+          replyrate: 0.15
+          learning: true
+          cooldown: 0
+          maxchain: 50
+          sanity: 0
+          triggers:
+          - radbot
+          articles:
+          - loser
