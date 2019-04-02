@@ -29,8 +29,8 @@ class moduleClass(botmodule):
 			self.cached[download] = False
 			self.cached_list[download] = []
 
-	async def upload_flag(self, client, config, message):
-		cmd = await client.get_cmd(message)
+	def upload_flag(self, client, config, message):
+		cmd = client.get_cmd(message)
 		key = cmd["cmd"]
 		self.cached[key] = False
 		try:
@@ -39,7 +39,7 @@ class moduleClass(botmodule):
 				for link in message.attachments:
 					urls.append((link.url, link.filename.split('.')[0]))
 			#append args
-			print(urls)
+			messages = []
 			for urlp in urls:
 				filename = urlp[1]
 				url = urlp[0]
@@ -51,8 +51,7 @@ class moduleClass(botmodule):
 					ctt.write(chunk)
 					if size > config["uploads"][key]["max_filesize"]:
 						r.close()
-						await message.channel.send("That file is too big")
-						raise
+						messages.append("That file is too big")
 				content = ctt.getvalue()
 				img_in = Image.open(io.BytesIO(content))
 				hash = hashlib.md5()
@@ -61,7 +60,7 @@ class moduleClass(botmodule):
 				if img_in.format == "GIF" and not config["uploads"][key]["resize"]:
 					img_in.save(config["uploads"][key]["local_folder"] + i + '.gif', 'GIF', save_all=True, optimize=False)
 					if key in config["downloads"]:
-						await message.channel.send(config["uploads"][key]["web_folder"] + i + ".gif")
+						messages.append("<" + config["downloads"][key]["web_folder"] + i + ".gif>")
 				else:
 					if config["uploads"][key]["raw_folder"]:
 						img_in.save(config["uploads"][key]["raw_folder"] + filename + '-' + i + '.png', 'PNG')
@@ -72,26 +71,26 @@ class moduleClass(botmodule):
 						img_out = img_in.resize((x,y), Image.ANTIALIAS)
 					img_out.save(config["uploads"][key]["local_folder"] + i + '.png', 'PNG')
 					if key in config["downloads"]:
-						await message.channel.send(config["downloads"][key]["web_folder"] + i + ".png")
-			return
+						messages.append("<" + config["downloads"][key]["web_folder"] + i + ".png>")
+			return messages
 		except:
 			logging.error(traceback.print_exc())
-			await message.channel.send("Problem flagging that")
-			pass
-		return
+		return ["Problem flagging that"]
 
 	async def on_message(self, client, config, message):
 		print(message)
-		cmd = await client.get_cmd(message)
+		cmd = client.get_cmd(message)
 		uploaded = False
 		if cmd:
 			#redo logic here/check args for upload case
 			if config["uploads"] != None and (len(cmd["args"]) > 0 or len(message.attachments) > 0):
 				for upload in config["uploads"]:
 					if cmd["cmd"] == upload:
+						replies = []
 						async with message.channel.typing():
-							await self.upload_flag(client, config, message)
+							replies =  self.upload_flag(client, config, message)
 							uploaded = True
+						await message.channel.send(" ".join(replies))
 			if not uploaded:
 				for download in config["downloads"]:
 					if cmd["cmd"] == download:

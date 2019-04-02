@@ -147,11 +147,8 @@ class jambot(discord.Client):
 			return {"server": channel.id, "channel": channel.id}
 		return {}
 
-	async def cmd(self):
-		return self.config["command_prefix"]
-
-	async def get_cmd(self, message):
-		cmd = await self.cmd()
+	def get_cmd(self, message):
+		cmd = self.config["command_prefix"]
 		admin = False
 		if message.author.id == self.config["owner"]:
 			admin = True
@@ -179,7 +176,7 @@ class jambot(discord.Client):
 				await inst["module"].on_typing(self, inst["config"], channel, user, when)
 
 	async def on_message(self, message):
-		cmd = await self.get_cmd(message)
+		cmd = self.get_cmd(message)
 		if (cmd):
 			if cmd["cmd"] == "save" and cmd["admin"]:
 				print(yaml.dump(self.config, default_flow_style=False))

@@ -2,7 +2,6 @@ from botmodule import botmodule
 from random import choice
 from io import BytesIO
 import discord
-import pycurl
 import logging
 import sys
 import random
@@ -38,7 +37,8 @@ class moduleClass(botmodule):
 		"cooldown":2,
 		"triggers": ["jambot"],
 		"table_id": "jambot",
-		"articles": ["<#sender>", "<#nick>", "<#@ping>", "you", "she", "he", "they"]
+		"articles": ["<#sender>", "<#nick>", "<#@ping>", "you", "she", "he", "they"],
+		"blacklist": [] #hacky bullshit
 		}
 
 	def on_init(self):
@@ -203,7 +203,7 @@ class moduleClass(botmodule):
 			raise
 
 	async def on_message(self, client, config, message):
-		cmd = await client.get_cmd(message)
+		cmd = client.get_cmd(message)
 		sender = random.choice(config["articles"])
 		if sender == "<#@ping>":
 			sender = "<@!" + str(message.author.id) + ">"
@@ -214,7 +214,7 @@ class moduleClass(botmodule):
 				sender = message.author.nick
 			else:
 				sender = message.author.name
-		if not message.author.id == client.user.id:
+		if (not message.author.id == client.user.id) and (not message.channel.id in config["blacklist"]):
 			if cmd:
 				await self.do_command(client, config, message)
 			else:
@@ -242,14 +242,16 @@ class moduleClass(botmodule):
 						pass
 
 	async def do_command(self, client, config, message):
-		cmd = await client.get_cmd(message)
+		cmd = client.get_cmd(message)
 		command = cmd["cmd"]
 		args = cmd["args"]
 		admin = cmd["admin"]
 		if command=="feed" and admin:
 			links = []
+			#todo do this with requests instead to avoid lib stupid shit
 			if args:
-				links = re.findall(r'(https?://\S+)', ' '.join(args))
+				#links = re.findall(r'(https?://\S+)', ' '.join(args))
+				pass
 			if len(links) > 0:
 				logging.info("Downloading: " + links[0])
 				await message.channel.send("Downloading: " + links[0])
