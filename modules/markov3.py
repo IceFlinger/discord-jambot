@@ -9,6 +9,8 @@ import re
 import time
 import string
 import threading
+import datetime
+from twitter import *
 import math
 
 #Markov chain jambot-discord module
@@ -38,11 +40,18 @@ class moduleClass(botmodule):
 		"triggers": ["jambot"],
 		"table_id": "jambot",
 		"articles": ["<#sender>", "<#nick>", "<#@ping>", "you", "she", "he", "they"],
-		"blacklist": [] #hacky bullshit
+		"blacklist": [], #hacky bullshit
+		"tweet_thres": 2,
+		"access_token": "",
+		"access_secret": "",
+		"consumer_secret": "",
+		"consumer_key": "",
+		"twitter_name": ""
 		}
 
 	def on_init(self):
 		self.logger = logging.getLogger("jambot.markov3")
+		self.tweeted = []
 
 	async def on_connect(self, client, config):
 		self.tablename = "markov_" + config["table_id"]
@@ -328,3 +337,19 @@ class moduleClass(botmodule):
 			contexts = await client.db_query("SELECT sum(freq) FROM  " + self.tablename)[0][0]
 			await client.db_commit()
 			await message.channel.send("Now have " + str(contexts)  + " contexts.")
+
+	async def on_reaction_add(self, client, config, reaction, user):
+		#my message
+		mine = reaction.message.auth == client.user.id
+		#newer than a day
+		fresh = reaction.message.created_at > (datetime.now() - datetime.day)
+		#not tweeted already
+		new = reaction.message.id not in self.tweeted
+		#twitter enabled/keys set
+		tweeting = config["access_token"] != "" and config["access_secret"] != "" and config["consumer_token"] != "" and config["consumer_secret"] != "" and config["twitter_name"] != ""
+		if mine and fresh and new and tweeting:
+			if reaction.count >= config["tweet_thres"]:
+				t = Twitter(auth=OAuth(self.get("access_token"), self.get("access_secret"),self.get("consumer_key"), self.get("consumer_secret")))
+				response = t.statuses.update(status=reaction.message.content)
+				reaction.message.channel.send("https://twitter.com/" + config["twitter_name"] + "/status/" + response["id_str"])
+				self.tweeted.append(reaction.message.id)
