@@ -78,16 +78,17 @@ class jambot(discord.Client):
 			except yaml.YAMLError as exc:
 				print(exc)
 		self.mods = loaded_mods()
-		for module in self.config["global_modules"]:
-			self.mods.loadmod(module)
-			print("Loaded " + module + "(Global)")
-			settings = self.mods.instances[module].defaults
-			try:
-				for setting in self.config[module]:
-					settings[setting] = self.config[module][setting]
-			except:
-				pass
-			self.config[module] = settings
+		if "global_modules" in self.config:
+			for module in self.config["global_modules"]:
+				self.mods.loadmod(module)
+				print("Loaded " + module + "(Global)")
+				settings = self.mods.instances[module].defaults
+				try:
+					for setting in self.config[module]:
+						settings[setting] = self.config[module][setting]
+				except:
+					pass
+				self.config[module] = settings
 		try:
 			for server in self.config["servers"]:
 				try:
