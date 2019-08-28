@@ -13,6 +13,19 @@ class moduleClass(botmodule):
 	def on_init(self):
 		self.logger = logging.getLogger("jambot.monitor")
 
+	def get_monitor_context(channel, user):
+		if isinstance(channel, discord.TextChannel):
+			#We're in a regular server channel
+			return channel.guild.name, channel.name, user.name
+		else:
+			if isinstance(channel, discord.GroupChannel):
+				if channel.name:
+					return channel.owner.name, channel.name, user.name
+				else:
+					return channel.owner.name, "group", user.name
+			else:
+				return channel.recipient.name, "DM", user.name
+
 	async def context_string(self, client):
 		server = client.get_guild(self.server)
 		channel = client.get_channel(self.channel)
@@ -34,34 +47,12 @@ class moduleClass(botmodule):
 
 	async def on_typing(self, client, config, channel, user, when):
 		self.logger.log(config["level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
-		try:
-			serv = str(channel.guild.name)
-		except:
-			serv = ""
-		try:
-			chan = str(channel.name)
-		except AttributeError:
-			chan = str(channel.me.name)
-		try:
-			nick = user.nick
-		except:
-			nick = user.name
+		serv, chan, nick = get_monitor_context(channel, user)
 		self.logger.log(config["message_level"], serv + "/" + chan + " " + nick + " typing at: " +  str(when))
 
 	async def on_message(self, client, config, message):
 		self.logger.log(config["level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
-		try:
-			serv = str(message.channel.guild.name)
-		except:
-			serv = ""
-		try:
-			chan = str(message.channel.name)
-		except AttributeError:
-			chan = str(message.channel.me.name)
-		try:
-			nick = message.author.nick
-		except:
-			nick = message.author.name
+		serv, chan, nick = get_monitor_context(channel, user)
 		self.logger.log(config["message_level"], serv + "/" + chan + " " + nick + ": " +  message.content)
 
 	async def on_message_delete(self, client, config, message):
