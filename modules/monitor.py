@@ -1,5 +1,6 @@
 from botmodule import botmodule 
 import logging
+import discord
 import inspect
 
 class moduleClass(botmodule):
@@ -13,7 +14,7 @@ class moduleClass(botmodule):
 	def on_init(self):
 		self.logger = logging.getLogger("jambot.monitor")
 
-	def get_monitor_context(channel, user):
+	def get_monitor_context(self, channel, user):
 		if isinstance(channel, discord.TextChannel):
 			#We're in a regular server channel
 			return channel.guild.name, channel.name, user.name
@@ -47,12 +48,12 @@ class moduleClass(botmodule):
 
 	async def on_typing(self, client, config, channel, user, when):
 		self.logger.log(config["level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
-		serv, chan, nick = get_monitor_context(channel, user)
+		serv, chan, nick = self.get_monitor_context(channel, user)
 		self.logger.log(config["message_level"], serv + "/" + chan + " " + nick + " typing at: " +  str(when))
 
 	async def on_message(self, client, config, message):
 		self.logger.log(config["level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
-		serv, chan, nick = get_monitor_context(channel, user)
+		serv, chan, nick = self.get_monitor_context(message.channel, message.author)
 		self.logger.log(config["message_level"], serv + "/" + chan + " " + nick + ": " +  message.content)
 
 	async def on_message_delete(self, client, config, message):
