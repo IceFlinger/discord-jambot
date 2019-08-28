@@ -9,6 +9,8 @@ import re
 import time
 import string
 import threading
+from datetime import datetime, timedelta
+from twitter import *
 import math
 
 #Markov chain jambot-discord module
@@ -38,11 +40,21 @@ class moduleClass(botmodule):
 		"triggers": ["jambot"],
 		"table_id": "jambot",
 		"articles": ["<#sender>", "<#nick>", "<#@ping>", "you", "she", "he", "they"],
-		"blacklist": [] #hacky bullshit
+		"blacklist": [], #hacky bullshit
+		"tweet_thres": 2,
+		"tweet_delay": 60,
+		"access_token": "",
+		"access_secret": "",
+		"consumer_secret": "",
+		"consumer_key": "",
+		"twitter_name": ""
 		}
 
 	def on_init(self):
 		self.logger = logging.getLogger("jambot.markov3")
+		self.tweeted = []
+		self.composed = []
+		self.tweet_timer = datetime.now()
 
 	async def on_connect(self, client, config):
 		self.tablename = "markov_" + config["table_id"]
@@ -52,6 +64,7 @@ class moduleClass(botmodule):
 		await client.db_commit()
 		self.nickreply = False
 		self.lastmsg = 0
+		self.tweet_timer -= timedelta(seconds=config["tweet_delay"])
 
 	def select_context(self, config, contexts):
 		newpairs = {}
@@ -232,8 +245,9 @@ class moduleClass(botmodule):
 					response = ""
 					response = await self.build_sentence(client, config, msg, sender, message.channel)
 					if response != "":
-						await message.channel.send(response)
+						sent = await message.channel.send(response)
 						self.lastmsg = time.time()
+						self.composed.append(sent.id)
 				if config["learning"]:
 					try:
 						await self.learn_sentence(client, config, msg)
@@ -328,3 +342,21 @@ class moduleClass(botmodule):
 			contexts = await client.db_query("SELECT sum(freq) FROM  " + self.tablename)[0][0]
 			await client.db_commit()
 			await message.channel.send("Now have " + str(contexts)  + " contexts.")
+
+	async def on_reaction_add(self, client, config, reaction, user):
+		#my message
+		mine = reaction.message.author == client.user
+		#newer than a day
+		fresh = reaction.message.created_at > (datetime.now() - timedelta(days=1))
+		#not tweeted already
+		new = reaction.message.id not in self.tweeted
+		#something said by markov3 module
+		composed = reaction.message.id in self.composed
+		#twitter enabled/keys set
+		tweeting = config["access_token"] != "" and config["access_secret"] != "" and config["consumer_key"] != "" and config["consumer_secret"] != "" and config["twitter_name"] != ""
+		if mine and fresh and new and tweeting and composed:
+			if reaction.count >= config["tweet_thres"] and datetime.now() > (self.tweet_timer + timedelta(seconds=config["tweet_delay"])):
+				t = Twitter(auth=OAuth(config["access_token"], config["access_secret"] , config["consumer_key"], config["consumer_secret"]))
+				response = t.statuses.update(status=reaction.message.content)
+				await reaction.message.channel.send("https://twitter.com/" + config["twitter_name"] + "/status/" + response["id_str"])
+				self.tweeted.append(reaction.message.id)
