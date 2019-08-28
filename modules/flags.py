@@ -78,7 +78,6 @@ class moduleClass(botmodule):
 		return ["Problem flagging that"]
 
 	async def on_message(self, client, config, message):
-		print(message)
 		cmd = client.get_cmd(message)
 		uploaded = False
 		if cmd:
