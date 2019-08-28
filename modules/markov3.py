@@ -329,8 +329,9 @@ class moduleClass(botmodule):
 			message.channel.send("Currently have " + str(words) + " words and " + str(contexts)  + " contexts.")
 		elif command=="known" and args:
 			for word in args[:8]:
-				contexts = await client.db_query("SELECT sum(freq) FROM  " + self.tablename + " WHERE LOWER(word1) LIKE LOWER(?) OR LOWER(word2)\
-				 LIKE LOWER(?) OR LOWER(word3) LIKE LOWER(?)", (word, word, word))[0][0]
+				query = await client.db_query("SELECT sum(freq) FROM  " + self.tablename + " WHERE LOWER(word1) LIKE LOWER(?) OR LOWER(word2)\
+				 LIKE LOWER(?) OR LOWER(word3) LIKE LOWER(?)", (word, word, word))
+				contexts = query[0][0]
 				if contexts != None:
 					await message.channel.send("I know " + word + " in " + str(contexts)  + " contexts.")
 				else:
