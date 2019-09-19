@@ -1,5 +1,6 @@
 from botmodule import botmodule 
 import time
+import discord
 import datetime
 import logging
 
@@ -24,12 +25,12 @@ class moduleClass(botmodule):
 			command = cmd["cmd"]
 			args = cmd["args"]
 			admin = cmd["admin"]
-			if isinstance(channel, discord.DMChannel) and admin and command=="dump":
+			if isinstance(message.channel, discord.DMChannel) and admin and command=="dump":
 				if len(args) != 1:
 					await message.channel.send("Need channel id")
 				else:
-					channel = discord.utils.get(client.get_all_channels(), id=int(args[1]))
-					timestamp = datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d%H%M%S')
+					channel = discord.utils.get(client.get_all_channels(), id=int(args[0]))
+					timestamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d%H%M%S')
 					f = file(config["fileprefix"] + "-" + channel.guild.name + "-" + channel.name + "-" + timestamp + ".log", "w")
 					logging.info("Dumping..." + args[0])
 					linecount = 0
