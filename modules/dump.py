@@ -18,23 +18,24 @@ class moduleClass(botmodule):
 		f.write(timestamp + usertag + msg.clean_content)
 		
 
-	async def do_command(self, client, config, message):
+	async def on_message(self, client, config, message):
 		cmd = client.get_cmd(message)
-		command = cmd["cmd"]
-		args = cmd["args"]
-		admin = cmd["admin"]
-		if isinstance(channel, discord.DMChannel) and admin and command=="dump":
-			if len(args) != 1:
-				await message.channel.send("Need channel id")
-			else:
-				channel = discord.utils.get(client.get_all_channels(), id=int(args[1]))
-				timestamp = datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d%H%M%S')
-				f = file(config["fileprefix"] + "-" + channel.guild.name + "-" + channel.name + "-" + timestamp + ".log", "w")
-				logging.info("Dumping..." + args[0])
-				linecount = 0
-				async for histm in channel.history():
-					self.write_line(config, f, histm)
-					linecount += 1
-					if ((linecount%1000)==0):
-						logging.info(str(linecount/1000).split(".")[0] + "k lines")
-				logging.info("Dumped" + linecount + "lines")
+		if cmd:
+			command = cmd["cmd"]
+			args = cmd["args"]
+			admin = cmd["admin"]
+			if isinstance(channel, discord.DMChannel) and admin and command=="dump":
+				if len(args) != 1:
+					await message.channel.send("Need channel id")
+				else:
+					channel = discord.utils.get(client.get_all_channels(), id=int(args[1]))
+					timestamp = datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d%H%M%S')
+					f = file(config["fileprefix"] + "-" + channel.guild.name + "-" + channel.name + "-" + timestamp + ".log", "w")
+					logging.info("Dumping..." + args[0])
+					linecount = 0
+					async for histm in channel.history():
+						self.write_line(config, f, histm)
+						linecount += 1
+						if ((linecount%1000)==0):
+							logging.info(str(linecount/1000).split(".")[0] + "k lines")
+					logging.info("Dumped" + linecount + "lines")
