@@ -1,10 +1,11 @@
 from botmodule import botmodule 
 import time
 import datetime
+import logging
 
 class moduleClass(botmodule):
 	def default_config(self):
-		return {"fileprefix": "dump"
+		return {"fileprefix": "dump",
 		"userprefix": True,
 		"timeprefix": True}
 
@@ -28,7 +29,7 @@ class moduleClass(botmodule):
 			else:
 				channel = discord.utils.get(client.get_all_channels(), id=int(args[1]))
 				timestamp = datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d%H%M%S')
-				f = file(config["fileprefix"] + "-" channel.guild.name + "-" + channel.name + "-" + timestamp + ".log", "w")
+				f = file(config["fileprefix"] + "-" + channel.guild.name + "-" + channel.name + "-" + timestamp + ".log", "w")
 				logging.info("Dumping..." + args[0])
 				linecount = 0
 				async for histm in channel.history():
