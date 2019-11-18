@@ -148,6 +148,9 @@ class jambot(discord.Client):
 			return {"server": channel.id, "channel": channel.id}
 		return {}
 
+	def cmd_prefix(self):
+		return self.config["command_prefix"]
+
 	def get_cmd(self, message):
 		cmd = self.config["command_prefix"]
 		admin = False
