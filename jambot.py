@@ -467,7 +467,7 @@ class jambot(discord.Client):
 	async def on_member_update(self, before, after):
 		for module in self.mods.instances:
 			inst = await self.mods.fetch_mod_config(self.config, module)
-			serv = await self.get_server_context(guild)
+			serv = await self.get_server_context(after)
 			if inst["module"].context == "global" or (inst["module"].server == serv):
 				await inst["module"].on_member_update(self, inst["config"], before, after)
 

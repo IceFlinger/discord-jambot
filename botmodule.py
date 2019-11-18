@@ -151,4 +151,5 @@ class botmodule():
 	async def on_member_unban(self, client, config, guild, user):
 		pass
 
-
+	async def on_member_update(self, client, config, before, after):
+		pass
