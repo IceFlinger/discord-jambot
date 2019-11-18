@@ -14,10 +14,9 @@ class moduleClass(botmodule):
 		self.logger = logging.getLogger("jambot.dump")
 
 	def write_line(self, config, f, msg):
-		timestamp = string(msg.created_at + ": ") if config["timeprefix"] else ""
-		usertag = string(author.discriminator + ": ") if config["userprefix"] else ""
-		f.write(timestamp + usertag + msg.clean_content)
-		
+		timestamp = str(str(msg.created_at) + ": ") if config["timeprefix"] else ""
+		usertag = str(msg.author.name + "#" + msg.author.discriminator + ": ") if config["userprefix"] else ""
+		f.write(timestamp + usertag + msg.clean_content + "\n")		
 
 	async def on_message(self, client, config, message):
 		cmd = client.get_cmd(message)
@@ -31,12 +30,12 @@ class moduleClass(botmodule):
 				else:
 					channel = discord.utils.get(client.get_all_channels(), id=int(args[0]))
 					timestamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d%H%M%S')
-					f = file(config["fileprefix"] + "-" + channel.guild.name + "-" + channel.name + "-" + timestamp + ".log", "w")
+					f = open(config["fileprefix"] + "-" + channel.guild.name + "-" + channel.name + "-" + timestamp + ".log", "w")
 					logging.info("Dumping..." + args[0])
 					linecount = 0
-					async for histm in channel.history():
+					async for histm in channel.history(limit=None):
 						self.write_line(config, f, histm)
 						linecount += 1
 						if ((linecount%1000)==0):
 							logging.info(str(linecount/1000).split(".")[0] + "k lines")
-					logging.info("Dumped" + linecount + "lines")
+					logging.info("Dumped " + str(linecount) + " lines")

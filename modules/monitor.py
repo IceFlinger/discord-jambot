@@ -58,9 +58,14 @@ class moduleClass(botmodule):
 
 	async def on_message_delete(self, client, config, message):
 		self.logger.log(config["level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
+		serv, chan, nick = self.get_monitor_context(message.channel, message.author)
+		self.logger.log(config["message_level"], serv + "/" + chan + " " + nick + ": " +  message.content)
 
 	async def on_message_edit(self, client, config, before, after):
 		self.logger.log(config["level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
+		serv, chan, nick = self.get_monitor_context(before.channel, before.author)
+		self.logger.log(config["message_level"], serv + "/" + chan + " " + nick + ": " +  before.content)
+		self.logger.log(config["message_level"], serv + "/" + chan + " " + nick + ": " +  after.content)
 
 	async def on_reaction_add(self, client, config, reaction, user):
 		self.logger.log(config["level"], await self.context_string(client) + ": " +  inspect.stack()[0][3])
