@@ -42,37 +42,40 @@ class moduleClass(botmodule):
 
 	async def on_message(self, client, config, message):
 		cmd = client.get_cmd(message)
-		command = cmd["cmd"]
-		args = cmd["args"]
-		admin = cmd["admin"]
-		if command=="balance":
-			await self.create_account(client, config, message.author.id)
-			balance = await self.get_bal(client, config, message.author.id)
-			await message.channel.send("Your balance is " + str(balance) + config["symbol"])
-		if command=="send":
-			if len(args) != 2:
-				await message.channel.send("Send " + config["name"] + " to someone, usage: " + client.cmd_prefix() + "send @Recipient amount")
-			elif not mentionmatch.match(args[0]):
-				await message.channel.send("Unknown user " + args[0] + ", use a @Mention to select user, usage: " + client.cmd_prefix() + "send @Recipient amount")
-			elif not args[1].isdigit():
-				await message.channel.send("Not sure how to send " + args[1] + config["symbol"] + ", usage: " + client.cmd_prefix() + "send @Recipient amount")
-			elif len(message.mentions) != 1:
-				await message.channel.send("Can only send to a single user at once, usage: " + client.cmd_prefix() + "send @Recipient amount")
-			else:
-				recipient = message.mentions[0].id
-				sender = message.author.id
-				amount = int(args[1])
-				await self.create_account(client, config, sender)
-				sender_bal = await self.get_bal(client, config, sender)
-				if amount > sender_bal:
-					await message.channel.send("You don't have enough " + config["name"] + " to send that much (You have " + str(sender_bal) + config["symbol"] + ")")
+		if cmd:
+			command = cmd["cmd"]
+			args = cmd["args"]
+			admin = cmd["admin"]
+			if command=="balance":
+				await self.create_account(client, config, message.author.id)
+				balance = await self.get_bal(client, config, message.author.id)
+				await message.channel.send("Your balance is " + str(balance) + config["symbol"])
+			if command=="send":
+				if len(args) != 2:
+					await message.channel.send("Send " + config["name"] + " to someone, usage: " + client.cmd_prefix() + "send @Recipient amount")
+				elif not mentionmatch.match(args[0]):
+					await message.channel.send("Unknown user " + args[0] + ", use a @Mention to select user, usage: " + client.cmd_prefix() + "send @Recipient amount")
+				elif not args[1].isdigit():
+					await message.channel.send("Not sure how to send " + args[1] + config["symbol"] + ", usage: " + client.cmd_prefix() + "send @Recipient amount")
+				elif len(message.mentions) != 1:
+					await message.channel.send("Can only send to a single user at once, usage: " + client.cmd_prefix() + "send @Recipient amount")
 				else:
-					await self.create_account(client, config, recipient)
-					if self.check_enabled(client, config, sender) and self.check_enabled(client, config, sender):
-						await self.transfer_val(client, config, sender, recipient, amount)
-						new_bal = await self.get_bal(client, config, sender)
-						await message.channel.send("You sent " + amount + config["symbol"]+ " to " + args[0] + " (New balance: " + new_bal + config["symbol"] + ")")
+					recipient = message.mentions[0].id
+					sender = message.author.id
+					amount = int(args[1])
+					await self.create_account(client, config, sender)
+					sender_bal = await self.get_bal(client, config, sender)
+					if amount > sender_bal:
+						await message.channel.send("You don't have enough " + config["name"] + " to send that much (You have " + str(sender_bal) + config["symbol"] + ")")
 					else:
-						await message.channel.send("Can't perform transaction, disabled account involved.")
-		if command=="gift" and admin:
-			pass
+						await self.create_account(client, config, recipient)
+						sendok = await self.check_enabled(client, config, sender)
+						recvok = await self.check_enabled(client, config, sender)
+						if sendok and recvok:
+							await self.transfer_val(client, config, sender, recipient, amount)
+							new_bal = await self.get_bal(client, config, sender)
+							await message.channel.send("You sent " + str(amount) + config["symbol"]+ " to " + args[0] + " (New balance: " + str(new_bal) + config["symbol"] + ")")
+						else:
+							await message.channel.send("Can't perform transaction, disabled account involved.")
+			if command=="gift" and admin:
+				pass
