@@ -36,7 +36,7 @@ class moduleClass(botmodule):
 
 	async def on_connect(self, client, config):
 		self.tablename = "money_" + config["table_id"]
-		query = "CREATE TABLE IF NOT EXISTS " + self.tablename + " (id int PRIMARY KEY, val int DEFAULT 0, active bool DEFUALT true)"
+		query = "CREATE TABLE IF NOT EXISTS " + self.tablename + " (id int PRIMARY KEY, val int DEFAULT 0, active bool DEFAULT true)"
 		await client.db_query(query)
 		await client.db_commit()
 
@@ -70,7 +70,7 @@ class moduleClass(botmodule):
 					else:
 						await self.create_account(client, config, recipient)
 						sendok = await self.check_enabled(client, config, sender)
-						recvok = await self.check_enabled(client, config, sender)
+						recvok = await self.check_enabled(client, config, recipient)
 						if sendok and recvok:
 							await self.transfer_val(client, config, sender, recipient, amount)
 							new_bal = await self.get_bal(client, config, sender)
