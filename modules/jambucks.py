@@ -52,11 +52,11 @@ class moduleClass(botmodule):
 		if command=="send":
 			if len(args) != 2:
 				await message.channel.send("Send " + config["name"] + " to someone, usage: " + client.cmd_prefix() + "send @Recipient amount")
-			else if not mentionmatch.match(args[0]):
+			elif not mentionmatch.match(args[0]):
 				await message.channel.send("Unknown user " + args[0] + ", use a @Mention to select user, usage: " + client.cmd_prefix() + "send @Recipient amount")
-			else if not args[1].isdigit():
+			elif not args[1].isdigit():
 				await message.channel.send("Not sure how to send " + args[1] + config["symbol"] + ", usage: " + client.cmd_prefix() + "send @Recipient amount")
-			else if len(message.mentions) != 1:
+			elif len(message.mentions) != 1:
 				await message.channel.send("Can only send to a single user at once, usage: " + client.cmd_prefix() + "send @Recipient amount")
 			else:
 				recipient = message.mentions[0].id
@@ -75,3 +75,4 @@ class moduleClass(botmodule):
 					else:
 						await message.channel.send("Can't perform transaction, disabled account involved.")
 		if command=="gift" and admin:
+			pass
