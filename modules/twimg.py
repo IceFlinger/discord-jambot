@@ -27,7 +27,8 @@ class moduleClass(botmodule):
 		"access_secret": "",
 		"consumer_secret": "",
 		"consumer_key": "",
-		"twitter_name": ""}
+		"twitter_name": "",
+		"img_preview": False}
 
 	def on_init(self):
 		self.logger = logging.getLogger("jambot.twimg")	
@@ -46,7 +47,8 @@ class moduleClass(botmodule):
 					tweetId = tweet_id(link)
 					t = Twitter(auth=OAuth(config["access_token"], config["access_secret"], config["consumer_key"], config["consumer_secret"]))
 					status = t.statuses.show(id=tweetId, tweet_mode='extended')
-					await self.post_images(client, config, message, status)
+					if config["img_preview"]:
+						await self.post_images(client, config, message, status)
 					if "quoted_status_permalink" in status:
 						await message.channel.send(status["quoted_status_permalink"]["expanded"])
 		except:
