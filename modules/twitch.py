@@ -24,4 +24,4 @@ class moduleClass(botmodule):
 		now_streaming = self.get_stream(after)
 		if (not was_streaming) and now_streaming:
 			channel = discord.utils.get(client.get_all_channels(), id=config["announce_channel"])
-			channel.send(after.name + " is now streaming " + now_streaming.details + " at " + now_streaming.url)
+			await channel.send(after.name + " is now streaming " + now_streaming.details + " at " + now_streaming.url)
