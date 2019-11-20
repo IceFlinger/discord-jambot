@@ -28,10 +28,12 @@ class moduleClass(botmodule):
 		"consumer_secret": "",
 		"consumer_key": "",
 		"twitter_name": "",
+		"quote_depth": 2,
 		"img_preview": False}
 
 	def on_init(self):
 		self.logger = logging.getLogger("jambot.twimg")	
+		self.depth = 0
 
 	async def post_images(self, client, config, message, status):
 		#print(json.dumps(status))
@@ -49,8 +51,13 @@ class moduleClass(botmodule):
 					status = t.statuses.show(id=tweetId, tweet_mode='extended')
 					if config["img_preview"]:
 						await self.post_images(client, config, message, status)
-					if "quoted_status_permalink" in status:
+					if "quoted_status_permalink" in status and self.depth < config["quote_depth"]:
 						await message.channel.send(status["quoted_status_permalink"]["expanded"])
+						self.depth += 1
+					else:
+						self.depth = 0
+				else:
+					self.depth = 0
 		except:
 			for error in sys.exc_info():
 				print(str(error))
