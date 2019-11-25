@@ -263,68 +263,24 @@ class moduleClass(botmodule):
 		args = cmd["args"]
 		admin = cmd["admin"]
 		if command=="feed" and admin:
-			links = []
-			#todo do this with requests instead to avoid lib stupid shit
-			if args:
-				#links = re.findall(r'(https?://\S+)', ' '.join(args))
-				pass
-			if len(links) > 0:
-				logging.info("Downloading: " + links[0])
-				await message.channel.send("Downloading: " + links[0])
-				textbytes = BytesIO()
-				try:
-					textconn = pycurl.Curl()
-					textconn.setopt(textconn.URL, links[0])
-					textconn.setopt(textconn.WRITEDATA, textbytes)
-					textconn.perform()
-					textconn.close()
-					text = textbytes.getvalue().decode('iso-8859-1').split('\n')
-					linecount = 0
-					logging.info("Learning...")
-					await message.channel.send("Learning")
-					try:
-						for line in text:
-							line = mangle_line(line)
-							own_nick = " "
-							sender = " "
-							#await self.learn_sentence(client, config, line, own_nick, sender)
-							linecount += 1
-							if ((linecount%1000)==0):
-								logging.info(str(linecount/1000).split(".")[0] + "k lines, ", end="" , flush=True)
-						await client.db_commit()
-					except:
-						await message.channel.send("Interrupted while learning from file")
-						raise
-					try:
-						logging.info("Learned from " + str(linecount) + " lines")
-						await message.channel.send("Learned from " + str(linecount) + " lines")
-						await client.db_commit()
-						logging.info("Commited to DB")
-					except:
-						pass
-				except:
-					await message.channel.send("Couldn't download file.")
-					raise
+			hist = 1000
+			if len(args) > 1:
+				channel = discord.utils.get(client.get_all_channels(), id=int(args[0]))
+				hist = int(args[1])
 			else:
-				hist = 1000
-				if len(args) > 1:
-					channel = discord.utils.get(client.get_all_channels(), id=int(args[0]))
-					hist = int(args[1])
-				else:
-					channel = message.channel
-					hist = int(args[0])
-				logging.info("Learning...")
-				await message.channel.send("Learning from " + channel.name)
-				linecount = 0
-				async for histm in channel.history(limit=hist):
-					line = mangle_line(histm.content)
-					await self.learn_sentence(client, config, line, histm.author.id)
-					linecount += 1
-					if ((linecount%1000)==0):
-						logging.info(str(linecount/1000).split(".")[0] + "k lines")
-				await client.db_commit()
-				await message.channel.send("Learned from " + str(linecount) + " lines")
-
+				channel = message.channel
+				hist = int(args[0])
+			logging.info("Learning...")
+			await message.channel.send("Learning from " + channel.name)
+			linecount = 0
+			async for histm in channel.history(limit=hist):
+				line = mangle_line(histm.content)
+				await self.learn_sentence(client, config, line, histm.author.id)
+				linecount += 1
+				if ((linecount%1000)==0):
+					logging.info(str(linecount/1000).split(".")[0] + "k lines")
+			await client.db_commit()
+			await message.channel.send("Learned from " + str(linecount) + " lines")
 		elif command=="words":
 			words = await client.db_query("SELECT COUNT(*) FROM (SELECT DISTINCT LOWER(word1) FROM  " + self.tablename + ")")[0][0]
 			contexts = await db_query("SELECT sum(freq) FROM  " + self.tablename)[0][0]
