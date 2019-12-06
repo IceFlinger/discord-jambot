@@ -326,9 +326,9 @@ class moduleClass(botmodule):
 				await message.channel.send("Learned from " + str(linecount) + " lines")
 
 		elif command=="words":
-			words = await client.db_query("SELECT COUNT(*) FROM (SELECT DISTINCT LOWER(word1) FROM  " + self.tablename + ")")[0][0]
-			contexts = await db_query("SELECT sum(freq) FROM  " + self.tablename)[0][0]
-			message.channel.send("Currently have " + str(words) + " words and " + str(contexts)  + " contexts.")
+			words = await client.db_query("SELECT COUNT(*) FROM (SELECT DISTINCT LOWER(word1) FROM  " + self.tablename + ")")
+			contexts = await client.db_query("SELECT sum(freq) FROM  " + self.tablename)
+			await message.channel.send("Currently have " + str(words[0][0]) + " words and " + str(contexts[0][0])  + " contexts.")
 		elif command=="known" and args:
 			for word in args[:8]:
 				query = await client.db_query("SELECT sum(freq) FROM  " + self.tablename + " WHERE LOWER(word1) LIKE LOWER(?) OR LOWER(word2)\
