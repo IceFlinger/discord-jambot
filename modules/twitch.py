@@ -7,6 +7,7 @@ import discord
 class moduleClass(botmodule):
 	def default_config(self):
 		return {"announce_channel": 0, #bad gross wrong but im lazy
+		"ignore": [],
 		}
 
 	def on_init(self):
@@ -22,6 +23,6 @@ class moduleClass(botmodule):
 	async def on_member_update(self, client, config, before, after):
 		was_streaming = self.get_stream(before)
 		now_streaming = self.get_stream(after)
-		if (not was_streaming) and now_streaming:
+		if ((not was_streaming) and now_streaming) and (after.id not in config["ignore"]):
 			channel = discord.utils.get(client.get_all_channels(), id=config["announce_channel"])
 			await channel.send(after.name + " is now streaming " + now_streaming.details + " at " + now_streaming.url)

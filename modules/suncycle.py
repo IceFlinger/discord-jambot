@@ -72,3 +72,16 @@ class moduleClass(botmodule):
 	async def shift_picture(self, client, config, image):
 		server = client.get_guild(self.server)
 		await server.edit(icon=image)
+
+	async def on_message(self, client, config, message):
+		cmd = client.get_cmd(message)
+		if cmd:
+			command = cmd["cmd"]
+			args = cmd["args"]
+			admin = cmd["admin"]
+			if command=="day" and admin:
+				self.logger.log(20, "Forced changed to day")
+				await self.shift_picture(client, config, self.pics["sunrise"])
+			if command=="night" and admin:
+				self.logger.log(20, "Forced changed to day")
+				await self.shift_picture(client, config, self.pics["sunset"])

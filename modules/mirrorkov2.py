@@ -155,6 +155,7 @@ class moduleClass(botmodule):
 							roll = random.randint(1,100)
 							if roll <= config["sanity"]:
 								next_link = context
+								continue
 						if next_link[2] == "<@#mention>":
 							phrase.append(sender)
 						else:
@@ -198,6 +199,8 @@ class moduleClass(botmodule):
 					if (words[word].lower() in config["triggers"]) or mentionmatch.match(words[word]):
 						mention = True
 						words[word]="<@#mention>"
+					if words[word].lower() == '@everyone':
+						words[word]="everyone"
 				index = 0
 				if not (mention and wlen<5):
 					if wlen > 3:

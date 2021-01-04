@@ -1,11 +1,10 @@
 from botmodule import botmodule 
-import time
+import re
 import discord
 import datetime
 import random
 import logging
 import requests
-from io import BytesIO
 
 linkmatch = re.compile(r'(https?://\S+)')
 
@@ -17,11 +16,6 @@ class moduleClass(botmodule):
 	def on_init(self):
 		self.logger = logging.getLogger("jambot.renamer")
 
-	def write_line(self, config, f, msg):
-		timestamp = str(str(msg.created_at) + ": ") if config["timeprefix"] else ""
-		usertag = str(msg.author.name + "#" + msg.author.discriminator + ": ") if config["userprefix"] else ""
-		f.write(timestamp + usertag + msg.clean_content + "\n")		
-
 	async def on_message(self, client, config, message):
 		cmd = client.get_cmd(message)
 		if cmd:
@@ -32,11 +26,11 @@ class moduleClass(botmodule):
 				users = []
 				for user in message.guild.members:
 					users.append(user)
-				filename = str(time.now()) + ".txt"
+				filename = ''.join(str(datetime.datetime.now()).split('\n')) + ".txt"
 				with open(config["localfolder"] + filename, 'w') as out:
-  				  for user in users:
-  				  	out.write(user.name + "#" + user.discriminator + "\n")
-  				await message.channel.send(config["webfolder"] + filename)
+					for user in users:
+						out.write(user.name + "#" + user.discriminator + ":" + user.nick + "\n")
+				await message.channel.send(config["webfolder"] + filename)
 			if admin and command=="setnames" and len(linkmatch.findall(args[0])) == 1:
 				r = requests.get(args[0])
 				setnames = {}

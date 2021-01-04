@@ -38,6 +38,9 @@ class moduleClass(botmodule):
 			if len(message.attachments) > 0:
 				for link in message.attachments:
 					urls.append((link.url, link.filename.split('.')[0]))
+			if len(cmd["args"]) > 0:
+				for arg in cmd["args"]:
+					urls.append((arg, arg.split('/')[-1].split('.')[-2]))
 			#append args
 			messages = []
 			for urlp in urls:

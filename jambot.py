@@ -11,7 +11,7 @@ import logging
 import json
 import pyodbc
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, handlers=[logging.FileHandler("jambolog.txt"),logging.StreamHandler()])
 
 config_file = "jambot.yml"
 
