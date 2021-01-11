@@ -51,15 +51,14 @@ class moduleClass(botmodule):
 	async def send_game_input(self, client, config, button, channel):
 		async with channel.typing():
 			self.emu.send_input(button[0])
-			self.emu.tick()
+			await asyncio.sleep(0.2)
 			self.emu.send_input(button[1])
 			await asyncio.sleep(config["input_frame_delay"])
 			await self.send_frame(client, config, channel)
 
 	async def on_message(self, client, config, message):
 		cmd = client.get_cmd(message)
-		if cmd:
-			if cmd["cmd"] == "frame":
+		if message.content == "f":
 				await self.send_frame(client, config, message.channel)
 		if message.content in button_map_words:
 			await self.send_game_input(client, config, button_map_words[message.content], message.channel)
