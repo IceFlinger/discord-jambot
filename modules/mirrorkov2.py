@@ -21,10 +21,10 @@ linkmatch = re.compile(r'(https?://\S+)')
 
 def mangle_line(line):
 	links = linkmatch.findall(line) 
-	f = string.ascii_letters + string.digits + "():<>[].,!?/-^%$#@ "
+	#f = string.ascii_letters + string.digits + "():<>[].,!?/-^%$#@ "
 	line = ' '.join(w for w in line.split() if w not in links) #Remove URLs
 	line = ' '.join(w for w in line.split() if w[0] not in "[\"(") #Remove timestamp type stuff and quotes
-	line = ' '.join(w for w in line.split() if w[-1] not in "\;\"%") #Remove broken words
+	line = ' '.join(w for w in line.split() if w[-1] not in ";\"%") #Remove broken words
 	#line = ' '.join(w for w in line.split() if not len(w)>35) #Remove long stuff
 	#line = ''.join(c for c in line if c in f) #Filter whole string with f chars
 	#logging.info(line)
@@ -102,7 +102,7 @@ class moduleClass(botmodule):
 		#logging.info("Building sentence")
 		phrase = []
 		try:
-			chainlength = 0
+			#chainlength = 0
 			exist_contexts = [] #look for words in the trigger sentence that we know already
 			words = message.split()
 			for word in range(len(words)):

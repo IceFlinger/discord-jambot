@@ -1,0 +1,65 @@
+from botmodule import botmodule 
+import discord
+import pyboy
+import logging
+import asyncio
+import io
+from PIL import Image, ImageOps
+
+button_map_words = {
+	"up": (pyboy.WindowEvent.PRESS_ARROW_UP, pyboy.WindowEvent.RELEASE_ARROW_UP),
+	"down": (pyboy.WindowEvent.PRESS_ARROW_DOWN, pyboy.WindowEvent.RELEASE_ARROW_DOWN),
+	"right": (pyboy.WindowEvent.PRESS_ARROW_RIGHT, pyboy.WindowEvent.RELEASE_ARROW_RIGHT),
+	"left": (pyboy.WindowEvent.PRESS_ARROW_LEFT, pyboy.WindowEvent.RELEASE_ARROW_LEFT),
+	"a": (pyboy.WindowEvent.PRESS_BUTTON_A, pyboy.WindowEvent.RELEASE_BUTTON_A),
+	"b": (pyboy.WindowEvent.PRESS_BUTTON_B, pyboy.WindowEvent.RELEASE_BUTTON_B),
+	"start": (pyboy.WindowEvent.PRESS_BUTTON_START, pyboy.WindowEvent.RELEASE_BUTTON_START),
+	"select": (pyboy.WindowEvent.PRESS_BUTTON_SELECT, pyboy.WindowEvent.RELEASE_BUTTON_SELECT)
+}
+
+class moduleClass(botmodule):
+	def default_config(self):
+		return {"romname": "red.gb",
+			"frame_file": "frame.png",
+			"save_state": "game.state",
+			"input_frame_delay": 1.7}
+
+	async def on_ready(self, client, config):
+		self.emu = pyboy.PyBoy(config["romname"])
+		try:
+			save_state = open(config["save_state"], "rb")
+			self.emu.load_state(save_state)
+			save_state.close()
+		except:
+			save_state = open(config["save_state"], "x")
+			save_state.close()
+		await self.emu_tick(client, config)
+
+	async def emu_tick(self, client, config):
+		self.emu.tick()
+		loop = asyncio.get_running_loop()
+		asyncio.run_coroutine_threadsafe(self.emu_tick(client, config), loop)
+
+	async def send_frame(self, client, config, channel):
+		frame_raw = self.emu.botsupport_manager().screen().screen_image()
+		frame_raw.save(config["frame_file"], "PNG")
+		screen = await channel.send(file=discord.File(config["frame_file"]))
+		save_state = open(config["save_state"], "wb")
+		self.emu.save_state(save_state)
+		save_state.close()
+
+	async def send_game_input(self, client, config, button, channel):
+		async with channel.typing():
+			self.emu.send_input(button[0])
+			self.emu.tick()
+			self.emu.send_input(button[1])
+			await asyncio.sleep(config["input_frame_delay"])
+			await self.send_frame(client, config, channel)
+
+	async def on_message(self, client, config, message):
+		cmd = client.get_cmd(message)
+		if cmd:
+			if cmd["cmd"] == "frame":
+				await self.send_frame(client, config, message.channel)
+		if message.content in button_map_words:
+			await self.send_game_input(client, config, button_map_words[message.content], message.channel)

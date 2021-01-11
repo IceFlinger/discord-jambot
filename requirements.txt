@@ -1,0 +1,8 @@
+discord.py>=1.6.0
+asyncio>=3.4.3
+aioodbc>=0.3.3
+pyodbc>=4.0.24
+Pillow>=8.1.0
+requests>=2.25.1
+pyyaml>=5.3.1
+python-twitter>=3.4.2
