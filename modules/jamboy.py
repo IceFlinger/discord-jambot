@@ -42,7 +42,9 @@ class moduleClass(botmodule):
 		return {"romname": "red.gb",
 			"frame_file": "frame.png",
 			"save_state": "game.state",
-			"button_press_ticks": 3,
+			"button_press_ticks": 4,
+			"blend": 0.4,
+			"color": '#779679',
 			"input_frame_delay": 0.3}
 
 	async def on_ready(self, client, config):
@@ -72,6 +74,8 @@ class moduleClass(botmodule):
 					await asyncio.sleep(0.1)
 					self.frame_timer = self.frame_timer - 0.1
 				frame_raw = self.emu.botsupport_manager().screen().screen_image()
+				color = Image.new('RGB', frame_raw.size, config["color"])
+				frame_raw = Image.blend(frame_raw, color, config["blend"])
 				frame_raw.save(config["frame_file"], "PNG")
 				screen = await channel.send(file=discord.File(config["frame_file"]))
 				save_state = open(config["save_state"], "wb")
