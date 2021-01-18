@@ -312,7 +312,7 @@ class moduleClass(botmodule):
 		fresh = reaction.message.created_at > (datetime.now() - timedelta(days=1))
 		#not tweeted already
 		new = reaction.message.id not in self.tweeted
-		#something said by markov3 module
+		#something said by this module
 		composed = reaction.message.id in self.composed
 		#twitter enabled/keys set
 		tweeting = config["access_token"] != "" and config["access_secret"] != "" and config["consumer_key"] != "" and config["consumer_secret"] != "" and config["twitter_name"] != ""

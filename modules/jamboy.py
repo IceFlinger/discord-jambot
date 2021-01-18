@@ -76,8 +76,10 @@ class moduleClass(botmodule):
 				frame_raw = self.emu.botsupport_manager().screen().screen_image()
 				color = Image.new('RGB', frame_raw.size, config["color"])
 				frame_raw = Image.blend(frame_raw, color, config["blend"])
+				width, height = frame_raw.size
+				frame_raw = frame_raw.resize((width*2,height*2), Image.NEAREST)
 				frame_raw.save(config["frame_file"], "PNG")
-				screen = await channel.send(file=discord.File(config["frame_file"]))
+				await channel.send(file=discord.File(config["frame_file"]))
 				save_state = open(config["save_state"], "wb")
 				self.emu.save_state(save_state)
 				save_state.close()
@@ -95,7 +97,6 @@ class moduleClass(botmodule):
 		await self.send_frame(client, config, channel)
 
 	async def on_message(self, client, config, message):
-		cmd = client.get_cmd(message)
 		if message.content == "f":
 			self.frame_timer = 0.1
 			await self.send_frame(client, config, message.channel)
