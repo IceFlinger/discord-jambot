@@ -52,8 +52,8 @@ class moduleClass(botmodule):
 					if config["img_preview"]:
 						await self.post_images(client, config, message, status)
 					if "quoted_status_permalink" in status and self.depth < config["quote_depth"]:
-						await message.channel.send(status["quoted_status_permalink"]["expanded"])
 						self.depth += 1
+						await message.channel.send(status["quoted_status_permalink"]["expanded"])
 					else:
 						self.depth = 0
 				else:
