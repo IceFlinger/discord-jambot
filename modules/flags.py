@@ -97,10 +97,12 @@ class moduleClass(botmodule):
 				for download in config["downloads"]:
 					if cmd["cmd"] == download:
 						alt = random.random()
-						print(alt)
-						print(config["downloads"][download]["alt_chance"])
+						try:
+							alt_chance = config["downloads"][download]["alt_chance"]
+						except KeyError:
+							alt_chance = 0
 						folder = config["downloads"][download]["web_folder"]
-						if alt < config["downloads"][download]["alt_chance"]:
+						if alt < alt_chance:
 							folder = config["downloads"][download]["alt_folder"]
 							self.cached[download] = False
 						async with message.channel.typing():
