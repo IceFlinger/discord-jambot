@@ -11,7 +11,7 @@ from PIL import Image, ImageOps
 class moduleClass(botmodule):
 
 	def default_config(self):
-		return {"downloads": {"example":{ "cache": True, "web_folder": "https://example.com/images/"}},
+		return {"downloads": {"example":{ "cache": True, "web_folder": "https://example.com/images/", "alt_chance": 0, "alt_folder": "https://example.com/images/"}},
 		"uploads": {"example":
 		{"local_folder": "/srv/www/images",
 		"raw_folder": "/backup/unconverted",
@@ -96,15 +96,23 @@ class moduleClass(botmodule):
 			if not uploaded:
 				for download in config["downloads"]:
 					if cmd["cmd"] == download:
+						alt = random.random()
+						print(alt)
+						print(config["downloads"][download]["alt_chance"])
+						folder = config["downloads"][download]["web_folder"]
+						if alt < config["downloads"][download]["alt_chance"]:
+							folder = config["downloads"][download]["alt_folder"]
+							self.cached[download] = False
 						async with message.channel.typing():
 							if (not self.cached[download]) or (not config["downloads"][download]["cache"]):
-								r = requests.get(config["downloads"][download]["web_folder"])
+								r = requests.get(folder)
 								d = html.fromstring(r.content)
 								imglist = d.xpath('//a[@href]/@href')
 								imglist = imglist[5:] #first 4 links are random index shit, lazy way to skip (add check for image extension)
 								self.cached_list[download] = imglist
-								self.cached[download] = True
+								if folder == config["downloads"][download]["web_folder"]:
+									self.cached[download] = True
 							else:
 								imglist  = self.cached_list[download] 
 							imgid = random.randint(0,len(imglist)-1)
-						await message.channel.send(config["downloads"][download]["web_folder"] + imglist[imgid])
+						await message.channel.send(folder + imglist[imgid])

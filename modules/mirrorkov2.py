@@ -232,7 +232,7 @@ class moduleClass(botmodule):
 				sender = message.author.nick
 			else:
 				sender = message.author.name
-		if (not message.author.id == client.user.id) and (not message.channel.id in config["blacklist"]):
+		if (not message.author.id == client.user.id) and (not message.channel.id in config["blacklist"]) and (not message.author.bot):
 			if cmd:
 				await self.do_command(client, config, message)
 			else:
