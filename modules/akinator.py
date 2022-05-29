@@ -105,6 +105,7 @@ class moduleClass(botmodule):
 										self.question_count += 1
 								except AkiNoQuestions:
 									self.guessing = True
+									candidate = await self.aki.win()
 									await message.channel.send("I think you are thinking of: ")
 									await message.channel.send(candidate['name'])
 									await message.channel.send(candidate['description'])
