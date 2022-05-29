@@ -74,7 +74,7 @@ class jambot(discord.Client):
 		self.config_file = config_file
 		with open(config_file) as stream:
 			try:
-				self.config = yaml.load(stream)
+				self.config = yaml.safe_load(stream)
 			except yaml.YAMLError as exc:
 				print(exc)
 		self.mods = loaded_mods()
