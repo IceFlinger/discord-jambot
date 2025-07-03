@@ -11,7 +11,7 @@ import logging
 import json
 import pyodbc
 
-logging.basicConfig(level=logging.INFO, handlers=[logging.FileHandler("jambolog.txt"),logging.StreamHandler()])
+#logging.basicConfig(level=logging.INFO, handlers=[logging.FileHandler("jambolog.txt"),logging.StreamHandler()])
 
 config_file = "jambot.yml"
 
@@ -142,7 +142,7 @@ class jambot(discord.Client):
 			channel = channel.message
 		if isinstance(channel, discord.Message):
 			channel = channel.channel
-		if isinstance(channel, discord.TextChannel):
+		if isinstance(channel, discord.TextChannel) or isinstance(channel, discord.Thread):
 			return {"server": channel.guild.id, "channel": channel.id}
 		else:
 			return {"server": channel.id, "channel": channel.id}
@@ -486,7 +486,9 @@ if __name__ == "__main__":
 		sys.exit(0)
 	if len(sys.argv) > 1:
 		config_file = sys.argv[1]
-	bot = jambot()
+	intents = discord.Intents.default()  # All but the THREE privileged ones
+	intents.message_content = True  # Subscribe to the Message Content intent
+	bot = jambot(intents=intents)
 	try:
 		bot.initialize(config_file)
 		bot.run(bot.config["token"])

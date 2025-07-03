@@ -2,6 +2,7 @@ from botmodule import botmodule
 import logging
 import discord
 import inspect
+from pprint import pprint
 
 class moduleClass(botmodule):
 
@@ -24,6 +25,11 @@ class moduleClass(botmodule):
 					return channel.owner.name, channel.name, user.name
 				else:
 					return channel.owner.name, "group", user.name
+			elif isinstance(channel, discord.Thread):
+				if channel.name:
+					return channel.guild.name, channel.name, user.name
+				else:
+					return channel.guild.name, "thread", user.name
 			else:
 				return channel.recipient.name, "DM", user.name
 

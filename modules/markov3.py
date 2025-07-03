@@ -10,7 +10,7 @@ import time
 import string
 import threading
 from datetime import datetime, timedelta
-from twitter import *
+#from twitter import *
 import math
 
 #Markov chain jambot-discord module
@@ -344,20 +344,20 @@ class moduleClass(botmodule):
 			await client.db_commit()
 			await message.channel.send("Now have " + str(contexts)  + " contexts.")
 
-	async def on_reaction_add(self, client, config, reaction, user):
-		#my message
-		mine = reaction.message.author == client.user
-		#newer than a day
-		fresh = reaction.message.created_at > (datetime.now() - timedelta(days=1))
-		#not tweeted already
-		new = reaction.message.id not in self.tweeted
-		#something said by markov3 module
-		composed = reaction.message.id in self.composed
-		#twitter enabled/keys set
-		tweeting = config["access_token"] != "" and config["access_secret"] != "" and config["consumer_key"] != "" and config["consumer_secret"] != "" and config["twitter_name"] != ""
-		if mine and fresh and new and tweeting and composed:
-			if reaction.count >= config["tweet_thres"] and datetime.now() > (self.tweet_timer + timedelta(seconds=config["tweet_delay"])):
-				t = Twitter(auth=OAuth(config["access_token"], config["access_secret"] , config["consumer_key"], config["consumer_secret"]))
-				response = t.statuses.update(status=reaction.message.content)
-				await reaction.message.channel.send("https://twitter.com/" + config["twitter_name"] + "/status/" + response["id_str"])
-				self.tweeted.append(reaction.message.id)
+#	async def on_reaction_add(self, client, config, reaction, user):
+#		#my message
+#		mine = reaction.message.author == client.user
+#		#newer than a day
+#		fresh = reaction.message.created_at > (datetime.now() - timedelta(days=1))
+#		#not tweeted already
+#		new = reaction.message.id not in self.tweeted
+#		#something said by markov3 module
+#		composed = reaction.message.id in self.composed
+#		#twitter enabled/keys set
+#		tweeting = config["access_token"] != "" and config["access_secret"] != "" and config["consumer_key"] != "" and config["consumer_secret"] != "" and config["twitter_name"] != ""
+#		if mine and fresh and new and tweeting and composed:
+#			if reaction.count >= config["tweet_thres"] and datetime.now() > (self.tweet_timer + timedelta(seconds=config["tweet_delay"])):
+#				t = Twitter(auth=OAuth(config["access_token"], config["access_secret"] , config["consumer_key"], config["consumer_secret"]))
+#				response = t.statuses.update(status=reaction.message.content)
+#				await reaction.message.channel.send("https://twitter.com/" + config["twitter_name"] + "/status/" + response["id_str"])
+#				self.tweeted.append(reaction.message.id)

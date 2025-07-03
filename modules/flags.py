@@ -110,11 +110,11 @@ class moduleClass(botmodule):
 								r = requests.get(folder)
 								d = html.fromstring(r.content)
 								imglist = d.xpath('//a[@href]/@href')
-								imglist = imglist[5:] #first 4 links are random index shit, lazy way to skip (add check for image extension)
+								imglist = imglist[1:] #first 4 links are random index shit, lazy way to skip (add check for image extension)
 								self.cached_list[download] = imglist
 								if folder == config["downloads"][download]["web_folder"]:
 									self.cached[download] = True
 							else:
-								imglist  = self.cached_list[download] 
+								imglist  = self.cached_list[download]
 							imgid = random.randint(0,len(imglist)-1)
 						await message.channel.send(folder + imglist[imgid])

@@ -9,8 +9,8 @@ import re
 import time
 import string
 import threading
-from datetime import datetime, timedelta
-from twitter import *
+from datetime import datetime, timedelta, timezone
+#from twitter import *
 import math
 
 #Markov chain jambot-discord module
@@ -232,7 +232,7 @@ class moduleClass(botmodule):
 				sender = message.author.nick
 			else:
 				sender = message.author.name
-		if (not message.author.id == client.user.id) and (not message.channel.id in config["blacklist"]) and (not message.author.bot):
+		if (not message.author.id == client.user.id) and (not message.channel.id in config["blacklist"]) and (not message.author.bot) and (not len(message.content) < 2):
 			if cmd:
 				await self.do_command(client, config, message)
 			else:
@@ -305,28 +305,29 @@ class moduleClass(botmodule):
 			await client.db_commit()
 			await message.channel.send("Now have " + str(contexts)  + " contexts.")
 
-	async def on_reaction_add(self, client, config, reaction, user):
+	#async def on_reaction_add(self, client, config, reaction, user):
 		#my message
-		mine = reaction.message.author == client.user
+		#mine = reaction.message.author == client.user
 		#newer than a day
-		fresh = reaction.message.created_at > (datetime.now() - timedelta(days=1))
+		#fresh = reaction.message.created_at > (timezone.utc - timedelta(days=1))
+		#fresh = True
 		#not tweeted already
-		new = reaction.message.id not in self.tweeted
+		#new = reaction.message.id not in self.tweeted
 		#something said by this module
-		composed = reaction.message.id in self.composed
+		#composed = reaction.message.id in self.composed
 		#twitter enabled/keys set
-		tweeting = config["access_token"] != "" and config["access_secret"] != "" and config["consumer_key"] != "" and config["consumer_secret"] != "" and config["twitter_name"] != ""
-		if mine and fresh and new and tweeting and composed:
-			if reaction.count >= config["tweet_thres"] and datetime.now() > (self.tweet_timer + timedelta(seconds=config["tweet_delay"])):
-				t = Twitter(auth=OAuth(config["access_token"], config["access_secret"] , config["consumer_key"], config["consumer_secret"]))
-				orig_msg = reaction.message.content
-				final_msg = ""
-				for word in orig_msg.split(" "):
-					if word in config["donttweet"]:
-						newword = config["donttweet_swaps"][random.randint(0,len(config["donttweet_swaps"]))-1]
-						final_msg += newword + " "
-					else:
-						final_msg += word + " "
-				response = t.statuses.update(status=final_msg)
-				await reaction.message.channel.send("https://twitter.com/" + config["twitter_name"] + "/status/" + response["id_str"])
-				self.tweeted.append(reaction.message.id)
+		#tweeting = config["access_token"] != "" and config["access_secret"] != "" and config["consumer_key"] != "" and config["consumer_secret"] != "" and config["twitter_name"] != ""
+		#if mine and fresh and new and tweeting and composed:
+		#	if reaction.count >= config["tweet_thres"] and datetime.now() > (self.tweet_timer + timedelta(seconds=config["tweet_delay"])):
+		#		t = Twitter(auth=OAuth(config["access_token"], config["access_secret"] , config["consumer_key"], config["consumer_secret"]))
+		#		orig_msg = reaction.message.content
+		#		final_msg = ""
+		#		for word in orig_msg.split(" "):
+		#			if word in config["donttweet"]:
+		#				newword = config["donttweet_swaps"][random.randint(0,len(config["donttweet_swaps"]))-1]
+		#				final_msg += newword + " "
+		#			else:
+		#				final_msg += word + " "
+		#		response = t.statuses.update(status=final_msg)
+		#		await reaction.message.channel.send("https://twitter.com/" + config["twitter_name"] + "/status/" + response["id_str"])
+		#		self.tweeted.append(reaction.message.id)
