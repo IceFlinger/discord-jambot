@@ -15,23 +15,10 @@ class moduleClass(botmodule):
 	def on_init(self):
 		self.logger = logging.getLogger("jambot.monitor")
 
-	def get_monitor_context(self, channel, user):
-		if isinstance(channel, discord.TextChannel):
-			#We're in a regular server channel
-			return channel.guild.name, channel.name, user.name
-		else:
-			if isinstance(channel, discord.GroupChannel):
-				if channel.name:
-					return channel.owner.name, channel.name, user.name
-				else:
-					return channel.owner.name, "group", user.name
-			elif isinstance(channel, discord.Thread):
-				if channel.name:
-					return channel.guild.name, channel.name, user.name
-				else:
-					return channel.guild.name, "thread", user.name
-			else:
-				return channel.recipient.name, "DM", user.name
+	def get_monitor_context(self, channel, user): # Union[TextChannel, StageChannel, VoiceChannel, Thread, DMChannel, GroupChannel, PartialMessageable]
+		if (isinstance(channel, discord.DMChannel) or isinstance(channel, discord.GroupChannel)):
+			return " ".join(channel.recipients), "DM", user.name
+		return channel.guild.name, channel.name, user.name
 
 	async def context_string(self, client):
 		server = client.get_guild(self.server)
